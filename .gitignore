@@ -35,3 +35,6 @@ bfg-report*
 /data/**/*.csv
 /data/20210331-c19_professions/profession-round-summary-prepared.csv
 .vscode/settings.json
+
+# build output (maven-resources-plugin copies the shaded jar here)
+/executables/
