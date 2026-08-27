@@ -703,7 +703,8 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
 
         if (PropertiesHandler.getInstance().isExportSummaryEachRound() || PropertiesHandler.getInstance().isExportAgentDetails()) {
             this.dgData.setNetStatsCurrent(new NetworkStats(this.network));
-            this.dgData.setIndexCaseStatsCurrent(new AgentStatsPre(this.indexCase, simulation.getRounds()));
+            this.dgData.setIndexCaseStatsCurrent(new AgentStatsPre(this.indexCase, simulation.getRounds(),
+                    PropertiesHandler.getInstance().isExportSummaryEachRoundCentralities()));
         }
         if (PropertiesHandler.getInstance().isExportSummaryEachRound()) {
             this.rsWriter.writeCurrentData();

@@ -32,6 +32,7 @@ import java.util.List;
 import nl.uu.socnetid.nidm.data.out.DataGeneratorData;
 import nl.uu.socnetid.nidm.data.out.LogValues;
 import nl.uu.socnetid.nidm.data.out.UtilityModelParameters;
+import nl.uu.socnetid.nidm.system.PropertiesHandler;
 
 /**
  * @author Hendrik Nunner
@@ -101,9 +102,11 @@ public abstract class RoundSummaryWriter<UMP extends UtilityModelParameters> ext
         // network
         cols.add(LogValues.DV_NET_AV_DEGREE.toString());
         cols.add(LogValues.DV_NET_AV_CLUSTERING.toString());
-        cols.add(LogValues.DV_NET_AV_PATHLENGTH.toString());
-        cols.add(LogValues.DV_NET_AV_BETWEENNESS.toString());
-        cols.add(LogValues.DV_NET_AV_CLOSENESS.toString());
+        if (PropertiesHandler.getInstance().isExportSummaryEachRoundCentralities()) {
+            cols.add(LogValues.DV_NET_AV_PATHLENGTH.toString());
+            cols.add(LogValues.DV_NET_AV_BETWEENNESS.toString());
+            cols.add(LogValues.DV_NET_AV_CLOSENESS.toString());
+        }
         cols.add(LogValues.DV_NET_ASSORTATIVITY_RISK_PERCEPTION.toString());
         cols.add(LogValues.DV_NET_ASSORTATIVITY_AGE.toString());
         cols.add(LogValues.DV_NET_ASSORTATIVITY_PROFESSION.toString());
@@ -113,8 +116,10 @@ public abstract class RoundSummaryWriter<UMP extends UtilityModelParameters> ext
         // index case
         cols.add(LogValues.DV_INDEX_DEGREE1.toString());
         cols.add(LogValues.DV_INDEX_CLUSTERING.toString());
-        cols.add(LogValues.DV_INDEX_BETWEENNESS_NORMALIZED.toString());
-        cols.add(LogValues.DV_INDEX_CLOSENESS.toString());
+        if (PropertiesHandler.getInstance().isExportSummaryEachRoundCentralities()) {
+            cols.add(LogValues.DV_INDEX_BETWEENNESS_NORMALIZED.toString());
+            cols.add(LogValues.DV_INDEX_CLOSENESS.toString());
+        }
         cols.add(LogValues.DV_INDEX_ASSORTATIVITY_RISK_PERCEPTION.toString());
         cols.add(LogValues.DV_INDEX_ASSORTATIVITY_AGE.toString());
         cols.add(LogValues.DV_INDEX_ASSORTATIVITY_PROFESSION.toString());
@@ -147,9 +152,11 @@ public abstract class RoundSummaryWriter<UMP extends UtilityModelParameters> ext
         // network
         currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvDegree()));
         currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvClustering()));
-        currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvPathLength(this.dgData.getSimStats().getCurrRound())));
-        currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvBetweenness(this.dgData.getSimStats().getCurrRound())));
-        currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvCloseness(this.dgData.getSimStats().getCurrRound())));
+        if (PropertiesHandler.getInstance().isExportSummaryEachRoundCentralities()) {
+            currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvPathLength(this.dgData.getSimStats().getCurrRound())));
+            currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvBetweenness(this.dgData.getSimStats().getCurrRound())));
+            currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAvCloseness(this.dgData.getSimStats().getCurrRound())));
+        }
         currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAssortativityRiskPerception()));
         currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAssortativityAge()));
         currData.add(String.valueOf(this.dgData.getNetStatsCurrent().getAssortativityProfession()));
@@ -159,8 +166,10 @@ public abstract class RoundSummaryWriter<UMP extends UtilityModelParameters> ext
         // index case
         currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getDegree1()));
         currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getClustering()));
-        currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getBetweennessNormalized()));
-        currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getCloseness()));
+        if (PropertiesHandler.getInstance().isExportSummaryEachRoundCentralities()) {
+            currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getBetweennessNormalized()));
+            currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getCloseness()));
+        }
         currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getAssortativityRiskPerception()));
         currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getAssortativityAge()));
         currData.add(String.valueOf(this.dgData.getIndexCaseStatsCurrent().getAssortativityProfession()));

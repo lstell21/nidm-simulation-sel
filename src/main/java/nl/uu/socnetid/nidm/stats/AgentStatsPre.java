@@ -54,6 +54,25 @@ public class AgentStatsPre {
     private final String profession;
 
     public AgentStatsPre(Agent agent, int simRound) {
+        this(agent, simRound, true);
+    }
+
+    /**
+     * Creates the stats, optionally skipping the centrality measures.
+     *
+     * Closeness and normalized betweenness go through the Gephi toolkit and are the most
+     * expensive values here. When these stats are built once per round (for the round
+     * summary) that cost dominates, so callers that do not need them can skip them; the
+     * corresponding fields are then NaN.
+     *
+     * @param agent
+     *          the agent to create the stats for
+     * @param simRound
+     *          the simulation round
+     * @param withCentralities
+     *          whether to compute closeness and normalized betweenness
+     */
+    public AgentStatsPre(Agent agent, int simRound, boolean withCentralities) {
         this.id = agent.getId();
         this.rSigma = agent.getRSigma();
         this.rSigmaNeighborhood = agent.getRSigmaNeighborhood();
@@ -65,9 +84,9 @@ public class AgentStatsPre {
         this.indexCaseDistance = -1;
         this.satisfied = agent.isSatisfied();
         this.degree1 = agent.getDegree();
-        this.closeness = agent.getCloseness(simRound);
+        this.closeness = withCentralities ? agent.getCloseness(simRound) : Double.NaN;
         this.clustering = agent.getClustering(simRound);
-        this.betweennessNormalized = agent.getBetweennessNormalized(simRound);
+        this.betweennessNormalized = withCentralities ? agent.getBetweennessNormalized(simRound) : Double.NaN;
         this.assortativityRiskPerception = agent.getAssortativity(simRound, AssortativityConditions.RISK_PERCEPTION);
         this.assortativityAge = agent.getAssortativity(simRound, AssortativityConditions.AGE);
         this.assortativityProfession = agent.getAssortativity(simRound, AssortativityConditions.PROFESSION);

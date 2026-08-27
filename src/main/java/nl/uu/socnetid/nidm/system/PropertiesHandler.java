@@ -118,6 +118,7 @@ public class PropertiesHandler {
     // types of data export
     private boolean exportSummary;
     private boolean exportSummaryEachRound;
+    private boolean exportSummaryEachRoundCentralities;
     private boolean exportAgentDetails;
     private boolean exportAgentDetailsReduced;
     private boolean exportGexf;
@@ -539,6 +540,9 @@ public class PropertiesHandler {
         // types of data export
         this.exportSummary = Boolean.parseBoolean(configProps.getProperty("export.summary"));
         this.exportSummaryEachRound = Boolean.parseBoolean(configProps.getProperty("export.summary.each.round"));
+        // defaults to true when absent, so existing configs keep the full round summary
+        this.exportSummaryEachRoundCentralities = Boolean.parseBoolean(
+                configProps.getProperty("export.summary.each.round.centralities", "true"));
         this.exportAgentDetails = Boolean.parseBoolean(configProps.getProperty("export.agent.details"));
         this.exportAgentDetailsReduced = Boolean.parseBoolean(configProps.getProperty("export.agent.details.reduced"));
         this.exportGexf = Boolean.parseBoolean(configProps.getProperty("export.gexf"));
@@ -681,6 +685,21 @@ public class PropertiesHandler {
      */
     public boolean isExportSummaryEachRound() {
         return exportSummaryEachRound;
+    }
+
+    /**
+     * Whether the round summary includes the centrality measures (average path length,
+     * betweenness, closeness, and the index case's betweenness and closeness).
+     *
+     * These are computed per round and are by far the most expensive part of the round
+     * summary: average path length runs a Dijkstra from every agent, and betweenness and
+     * closeness go through the Gephi toolkit. Turning them off roughly halves runtime.
+     * They are lazily evaluated, so not writing them means not computing them.
+     *
+     * @return the exportSummaryEachRoundCentralities
+     */
+    public boolean isExportSummaryEachRoundCentralities() {
+        return exportSummaryEachRoundCentralities;
     }
 
     /**
