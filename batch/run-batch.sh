@@ -21,7 +21,7 @@
 # to each level's total cost so they finish at about the same time.
 #
 # Usage:
-#   ./run-batch.sh --reps 5000 --shards 16 --omega 0
+#   ./run-batch.sh --reps 10000 --shards 16 --omega 0 --no-centralities
 #
 # Options:
 #   --reps N          replications per N level (default 5000)
@@ -31,10 +31,19 @@
 #   --zeta Z          override nb.zeta
 #   --omega V         fix nb.omega to V and set nb.omega.random=false
 #   --omega-random    force nb.omega.random=true
-#   --sigma-random    force nb.sigma.random=true  (the preprint's Table 1 needs
-#                     sigma to vary; the committed config pins it at 2.0)
+#   --encounters K    hold encounters per agent constant at K by setting
+#                     nb.phi = K/(N-1) per level (default 16 -- the Table 1
+#                     design; see the phi note below)
+#   --phi V           set a flat nb.phi proportion instead; overrides
+#                     --encounters
+#   --sigma-random    force nb.sigma.random=true (config.properties already
+#                     carries the Table 1 setting, so this is now redundant)
 #   --gamma-min V / --gamma-max V   override nb.gamma.random.min/max
 #   --alpha-min V / --alpha-max V   override nb.alpha.random.min/max
+#   --cost-exp E      cost model exponent for shard allocation (default 3.1;
+#                     measured 3.02 off / 3.17 on -- do not lower it)
+#   --no-centralities  gate the unread centrality fields out of the round
+#                     summary; worth 1.6-1.9x. Use it.
 #   --no-round-summary  set export.summary.each.round=false (breaks C1 figures)
 #   --heap SIZE       -Xmx per shard (default 1g)
 #   --out DIR         output root (default batch-runs/<timestamp>)
@@ -54,7 +63,9 @@ ZETA=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
 # fixed proportion does not deliver -- at nb.phi=0.20 an agent sees 16 peers at
 # N=80 but 96 at N=480. --encounters K sets nb.phi = K/(N-1) per shard so the
 # encounter count really is held constant.
-ENCOUNTERS=""; PHI=""
+# Constant phi ratified as the design 27 Aug 2026, so this defaults to 16 rather
+# than opt-in; --phi V is the escape hatch for a deliberately flat proportion.
+ENCOUNTERS=16; PHI=""
 GAMMA_MIN=""; GAMMA_MAX=""; ALPHA_MIN=""; ALPHA_MAX=""; SIGMA_MIN=""; SIGMA_MAX=""
 ROUND_SUMMARY=""; CENTRALITIES=""
 HEAP="1g"
@@ -85,7 +96,7 @@ while [ $# -gt 0 ]; do
         --alpha-min)        ALPHA_MIN="$2"; shift 2 ;;
         --alpha-max)        ALPHA_MAX="$2"; shift 2 ;;
         --encounters)       ENCOUNTERS="$2"; shift 2 ;;
-        --phi)              PHI="$2"; shift 2 ;;
+        --phi)              PHI="$2"; ENCOUNTERS=""; shift 2 ;;
         --cost-exp)         COST_EXP="$2"; shift 2 ;;
         --no-round-summary) ROUND_SUMMARY=false; shift ;;
         --no-centralities)  CENTRALITIES=false; shift ;;
