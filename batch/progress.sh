@@ -40,7 +40,7 @@ if [ -z "$active" ]; then
 fi
 
 echo "  in flight: $(basename "$active")"
-tot_done=0; tot_target=0; earliest=$now
+tot_done=0; tot_target=0; earliest=$now; worst=0
 for w in "$active"/work/*/; do
     [ -d "$w" ] || continue
     name=$(basename "$w")
@@ -59,6 +59,14 @@ for w in "$active"/work/*/; do
     else
         printf '    %-12s %4s/%-5s running  %s\n' \
             "$name" "$n" "$target" "$(hms $((now - st)))"
+        # The chunk ends when its SLOWEST shard does, so project each shard
+        # from its own rate and take the worst. A pooled rate is dominated by
+        # the small-N shards, which finish early and flatter the estimate
+        # badly -- 2h against a real ~11h on the first production chunk.
+        if [ "$n" -gt 0 ]; then
+            rem=$(( (now - st) * (target - n) / n ))
+            [ "$rem" -gt "$worst" ] && worst=$rem
+        fi
     fi
     tot_done=$((tot_done + n)); tot_target=$((tot_target + target))
 done
@@ -66,7 +74,8 @@ done
 if [ "$tot_target" -gt 0 ] && [ "$tot_done" -gt 0 ]; then
     el=$((now - earliest))
     pct=$((100 * tot_done / tot_target))
-    eta=$(( el * tot_target / tot_done - el ))
-    echo "  chunk: $tot_done/$tot_target sims (${pct}%), elapsed $(hms $el), ETA $(hms $eta)"
-    echo "  note: ETA assumes a uniform rate; the N=480 shards finish last."
+    echo "  chunk: $tot_done/$tot_target sims (${pct}%), elapsed $(hms $el)"
+    if [ "$worst" -gt 0 ]; then
+        echo "  chunk ETA $(hms $worst) (slowest shard)"
+    fi
 fi
