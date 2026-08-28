@@ -38,3 +38,6 @@ bfg-report*
 
 # build output (maven-resources-plugin copies the shaded jar here)
 /executables/
+
+# batch harness output (run-batch.sh defaults --out to batch-runs/<timestamp>)
+batch-runs/
