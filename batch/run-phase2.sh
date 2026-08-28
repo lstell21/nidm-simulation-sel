@@ -23,9 +23,15 @@
 #
 #   runA = omega ~ U[0,1]   runB = omega fixed at 0
 #
+# On completion the staged output is installed into the analysis repo, replacing
+# whatever was there, because read_and_merge_csvs() merges EVERY directory under
+# data/split -- leaving runA in place while copying runB in would silently pool
+# two different designs into one dataset.
+#
 # Overridable by env var:
 #   CHUNKS (5)  REPS (2000)  SHARDS (16)  HEAP (2g)
 #   NGRID (80,160,240,320,400,480)
+#   ANALYSIS (../SelSWIDM-analysis)   INSTALL (1; set 0 to stage only)
 
 set -u
 
@@ -43,11 +49,24 @@ REPS="${REPS:-2000}"
 SHARDS="${SHARDS:-16}"
 HEAP="${HEAP:-2g}"
 NGRID="${NGRID:-80,160,240,320,400,480}"
+ANALYSIS="${ANALYSIS:-$REPO/../SelSWIDM-analysis}"
+INSTALL="${INSTALL:-1}"
 
 ROOT="$REPO/batch-runs/$ARM"
 STAGE="$ROOT/merged"
 LOG="$ROOT/driver.log"
+PIDF="$ROOT/driver.pid"
 mkdir -p "$ROOT" "$STAGE"
+
+# Two drivers writing the same staging directory would corrupt it. The guard has
+# to live here rather than in phase2.sh, or launching run-phase2.sh directly
+# leaves no record and the wrapper cheerfully starts a second copy on top.
+if [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF" 2>/dev/null)" 2>/dev/null; then
+    echo "$ARM is already running as pid $(cat "$PIDF") -- refusing to start a second driver" >&2
+    exit 1
+fi
+echo $$ > "$PIDF"
+trap 'rm -f "$PIDF"' EXIT
 
 say() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG"; }
 
@@ -108,4 +127,24 @@ done
 total=$(for f in "$STAGE"/*/data/nunnerbuskens/simulation-summary.csv; do
             wc -l < "$f"; done | awk '{s += $1 - 1} END {print s}')
 say "=== $ARM complete: $total simulations across $CHUNKS chunks ==="
-say "    cp -r $STAGE/* <SelSWIDM-analysis>/data/split/"
+
+if [ "$INSTALL" != "1" ]; then
+    say "INSTALL=0, staged only. To install by hand:"
+    say "    cp -r $STAGE/* <SelSWIDM-analysis>/data/split/"
+elif [ ! -d "$ANALYSIS" ]; then
+    say "analysis repo not found at $ANALYSIS -- staged only. Install by hand:"
+    say "    cp -r $STAGE/* <SelSWIDM-analysis>/data/split/"
+else
+    prev=$(cat "$ANALYSIS/data/split/.arm" 2>/dev/null || echo none)
+    say "installing $ARM into $ANALYSIS/data/split (replacing: $prev)"
+    rm -rf "$ANALYSIS/data/split"
+    mkdir -p "$ANALYSIS/data/split"
+    cp -r "$STAGE"/* "$ANALYSIS/data/split/"
+    echo "$ARM" > "$ANALYSIS/data/split/.arm"
+    # read_ss_data() short-circuits on these, so they would shadow the new data;
+    # and the targets store has no dependency on them, so it would not notice.
+    rm -f "$ANALYSIS"/data/*.csv
+    rm -rf "$ANALYSIS/_targets"
+    say "installed. cached merges and targets store cleared."
+    say "next:  cd $ANALYSIS && Rscript run_targets.R"
+fi
