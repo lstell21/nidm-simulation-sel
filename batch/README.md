@@ -30,7 +30,10 @@ differs between runs.
 ./batch/run-batch.sh --reps 10000 --shards 16 --omega 0 --no-centralities
 
 # Phase 3 — narrowed gamma. alpha stays U[0,1]: Figure 3c IS the alpha x gamma
-# crossover, and narrowing alpha would shrink the range it is read from.
+# crossover. The gamma=0.1 curve slopes UP (outbreak size ~0.16 at alpha=0 to
+# ~0.32 at alpha=1) and crosses the other curves near alpha=0.87, so the
+# reversal being explained lives at HIGH alpha. Narrowing to U[0,0.3] would
+# sample the flat, uninformative end; narrow upward (U[0.6,1.0]) or not at all.
 # Draw it from Run A, so omega stays random.
 ./batch/run-batch.sh --reps 10000 --shards 16 \
     --gamma-min 0.1 --gamma-max 0.2 --omega-random --no-centralities
@@ -206,7 +209,11 @@ summary schema.
   (18 Jul 2024), which emits `nb.d`. Both Phase 2 runs are regenerated from this
   branch, so they carry `nb.d`: the analysis needs porting either way, and draft
   Table 3 is replaced rather than reproduced. No longer conditional.
-- **Phase 3 alpha range.** Gamma narrowing is settled at U[0.1, 0.2]. Alpha
-  stays U[0,1] — see the Phase 3 run line for why.
+- **Phase 3 adaptivity measure.** The Discussion's explanation, that tightly
+  knit structures hamper contact adjustment and let disease persist locally,
+  is testable from data already collected: sim.stage marks the active-epidemic
+  window, sim.cnt joins to gamma, and degree/clustering/homophily are recorded
+  per round. No new instrumentation needed, but the measure is not yet a
+  target in SelSWIDM-analysis.
 
 Closed: cost is now measured (see above); phi is ratified as a constant 16.
