@@ -38,6 +38,12 @@
 #                     --encounters
 #   --sigma-random    force nb.sigma.random=true (config.properties already
 #                     carries the Table 1 setting, so this is now redundant)
+#   --ep-structure V  set nb.ep.structure to dynamic|static|both. both = paired
+#                     static then dynamic epidemic on the same pre-epidemic
+#                     network and index case (NunnerBuskensDataGenerator lines
+#                     464-475); SelSWIDM-analysis currently refuses such
+#                     batches (assert_dynamic_only in R/00_data-wrangling.R)
+#                     until its readers are made design-aware
 #   --gamma-min V / --gamma-max V   override nb.gamma.random.min/max
 #   --alpha-min V / --alpha-max V   override nb.alpha.random.min/max
 #   --cost-exp E      cost model exponent for shard allocation (default 3.1;
@@ -49,10 +55,25 @@
 #   --out DIR         output root (default batch-runs/<timestamp>)
 #   --jar PATH        fat jar (default target/nidm-4.0.1.jar)
 #   --dry-run         print the plan, including shard allocation, and exit
+#
+# Platform: POSIX sh with GNU sed/awk/date (Linux, or Git Bash/MSYS on Windows;
+# macOS needs gsed for 'sed -i'). The classpath separator is chosen from
+# uname(1). Java 8 runtime; the jar is built once with Maven (see batch/README.md).
 
 set -e
 
+# Keep the full command line for batch-info.txt: the option loop below shifts
+# the positional parameters away, so "$*" is empty by the time it is written.
+ARGS="$*"
+
 REPO=$(cd "$(dirname "$0")/.." && pwd)
+
+# Java's classpath separator is ';' on Windows and ':' everywhere else. Runs A
+# and B were produced under Git Bash/MSYS; a Linux or macOS machine needs ':'.
+case "$(uname -s 2>/dev/null)" in
+    CYGWIN*|MINGW*|MSYS*) CPSEP=";" ;;
+    *)                    CPSEP=":" ;;
+esac
 NGRID="80,160,240,320,400,480"
 REPS=5000
 SHARDS=8
@@ -68,6 +89,7 @@ ZETA=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
 ENCOUNTERS=16; PHI=""
 GAMMA_MIN=""; GAMMA_MAX=""; ALPHA_MIN=""; ALPHA_MAX=""; SIGMA_MIN=""; SIGMA_MAX=""
 ROUND_SUMMARY=""; CENTRALITIES=""
+EP_STRUCTURE=""
 HEAP="1g"
 OUT=""
 JAR="$REPO/target/nidm-4.0.1.jar"
@@ -100,6 +122,7 @@ while [ $# -gt 0 ]; do
         --cost-exp)         COST_EXP="$2"; shift 2 ;;
         --no-round-summary) ROUND_SUMMARY=false; shift ;;
         --no-centralities)  CENTRALITIES=false; shift ;;
+        --ep-structure)     EP_STRUCTURE="$2"; shift 2 ;;
         --heap)             HEAP="$2"; shift 2 ;;
         --out)              OUT="$2"; shift 2 ;;
         --jar)              JAR="$2"; shift 2 ;;
@@ -150,8 +173,15 @@ echo "  heap per shard  : $HEAP"
 echo "  output          : $OUT"
 [ -n "$ZETA" ]          && echo "  zeta override   : $ZETA"
 [ -n "$OMEGA" ]         && echo "  omega fixed at  : $OMEGA"
+[ -n "$OMEGA_RANDOM" ]  && echo "  omega           : random"
+[ -n "$GAMMA_MIN$GAMMA_MAX" ] && echo "  gamma range     : ${GAMMA_MIN:-config}..${GAMMA_MAX:-config}"
+[ -n "$ALPHA_MIN$ALPHA_MAX" ] && echo "  alpha range     : ${ALPHA_MIN:-config}..${ALPHA_MAX:-config}"
+[ -n "$ENCOUNTERS" ]    && echo "  encounters      : $ENCOUNTERS per agent and step (nb.phi = $ENCOUNTERS/(N-1))"
+[ -n "$PHI" ]           && echo "  phi (flat)      : $PHI"
+[ -n "$CENTRALITIES" ]  && echo "  centralities    : $CENTRALITIES"
 [ -n "$SIGMA_RANDOM" ]  && echo "  sigma           : random"
 [ -n "$ROUND_SUMMARY" ] && echo "  round summary   : $ROUND_SUMMARY"
+[ -n "$EP_STRUCTURE" ] && echo "  ep structure    : $EP_STRUCTURE"
 echo
 echo "  shard allocation:"
 echo "$ALLOC" | while read -r N S; do
@@ -172,8 +202,16 @@ mkdir -p "$OUT/work" "$OUT/split"
     echo "ngrid           : $NGRID"
     echo "reps per N      : $REPS"
     echo "shards          : $SHARDS"
-    echo "command         : $0 $*"
+    echo "ep structure    : ${EP_STRUCTURE:-config (dynamic)}"
+    echo "omega           : ${OMEGA:-${OMEGA_RANDOM:+random}}"
+    echo "gamma range     : ${GAMMA_MIN:-config}..${GAMMA_MAX:-config}"
+    echo "alpha range     : ${ALPHA_MIN:-config}..${ALPHA_MAX:-config}"
+    echo "encounters      : ${ENCOUNTERS:-flat phi $PHI}"
+    echo "centralities    : ${CENTRALITIES:-config (true)}"
+    echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
+    echo "command         : $0 $ARGS"
 } > "$OUT/batch-info.txt"
+cp "$SRC_CONF" "$OUT/config.properties.source"
 
 CLASSESW=$(cygpath -w "$CLASSES" 2>/dev/null | tr '\\' '/' || echo "$CLASSES")
 JARW=$(cygpath -w "$JAR" 2>/dev/null | tr '\\' '/' || echo "$JAR")
@@ -233,6 +271,7 @@ while read -r NAME N SHARD_REPS; do
     [ -n "$ALPHA_MAX" ] && sed -i "s|^nb\.alpha\.random\.max=.*|nb.alpha.random.max=$ALPHA_MAX|" "$C"
     [ -n "$ROUND_SUMMARY" ] && sed -i "s|^export\.summary\.each\.round=.*|export.summary.each.round=$ROUND_SUMMARY|" "$C"
     [ -n "$CENTRALITIES" ] && sed -i "s|^export\.summary\.each\.round\.centralities=.*|export.summary.each.round.centralities=$CENTRALITIES|" "$C"
+    [ -n "$EP_STRUCTURE" ] && sed -i "s|^nb\.ep\.structure=.*|nb.ep.structure=$EP_STRUCTURE|" "$C"
 
     CONFW=$(cygpath -w "$SDIR/conf" 2>/dev/null | tr '\\' '/' || echo "$SDIR/conf")
 
@@ -241,7 +280,7 @@ while read -r NAME N SHARD_REPS; do
         cd "$SDIR"
         # 'if' rather than a bare call: under set -e a non-zero java exit would
         # abort the subshell before the exit code and end time were recorded.
-        if java -Xmx"$HEAP" -cp "$CONFW;$CLASSESW;$JARW" \
+        if java -Xmx"$HEAP" -cp "$CONFW$CPSEP$CLASSESW$CPSEP$JARW" \
                 nl.uu.socnetid.nidm.mains.Generator > "$SDIR/shard.log" 2>&1
         then RC=0; else RC=$?; fi
         echo "$RC" > "$SDIR/exit.code"

@@ -41,3 +41,5 @@ bfg-report*
 
 # batch harness output (run-batch.sh defaults --out to batch-runs/<timestamp>)
 batch-runs/
+# stray R plots
+Rplots.pdf

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Single entry point for a Phase 2 batch.
+# Single entry point for a Phase 2 or Phase 3 batch (arms: runA, runB, p3;
+# see run-phase2.sh).
 #
 #   ./batch/phase2.sh runA
 #
@@ -17,8 +18,8 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 
 ARM="${1:-}"
 case "$ARM" in
-    runA|runB) ;;
-    *) echo "usage: $(basename "$0") <runA|runB>" >&2; exit 2 ;;
+    runA|runB|p3) ;;
+    *) echo "usage: $(basename "$0") <runA|runB|p3>" >&2; exit 2 ;;
 esac
 
 ROOT="$REPO/batch-runs/$ARM"

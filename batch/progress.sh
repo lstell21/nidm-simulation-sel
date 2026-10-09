@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Live progress for a Phase 2 batch driven by run-phase2.sh.
+# Live progress for a Phase 2 or Phase 3 batch driven by run-phase2.sh.
 #
 # run-batch.sh prints its per-shard results only after the wait loop returns, so
 # driver.log goes quiet for the length of a chunk. The shards themselves write
 # their simulation-summary.csv incrementally, so counting rows there is the way
 # to see progress while it is happening.
 #
-# Usage:  ./batch/progress.sh [runA|runB]
+# Usage:  ./batch/progress.sh [runA|runB|p3]
 #
 # There is no `watch` in Git Bash on this host, so for a live view:
 #   while true; do clear; ./batch/progress.sh runA; sleep 60; done
