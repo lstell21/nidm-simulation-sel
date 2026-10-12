@@ -111,10 +111,25 @@ Run B ~18 h, p3 24 h at 14% before the machine was restarted unresponsive).
 Fixed by: `progress.sh` forking one `awk` per call (~4 processes including
 its own shell, ~85× fewer; output unchanged); `phase2.sh` refreshing every
 300 s instead of 60 (`INTERVAL`) without forking `cat`/`clear`; and the memory
-check above. Still: Ctrl-C the display once the run has started, check in
-with `./batch/progress.sh <arm>` now and then, and avoid other long-running
-polling loops in Git Bash on this machine. A reboot clears the leak, so
-rebooting between runs is cheap insurance.
+check above. For a multi-day run start the display with a long refresh
+(`INTERVAL=3600 ./batch/phase2.sh <arm>`), check in from a second window with
+`./batch/progress.sh <arm>`, and avoid other long-running polling loops in
+Git Bash on this machine. A reboot clears the leak, so rebooting between runs
+is cheap insurance.
+
+### Ctrl-C in the `phase2.sh` window kills the run (Git Bash)
+
+`phase2.sh` starts the driver with `nohup … &` from a non-interactive script,
+so the driver and its Java shards stay in the window's process group. Ctrl-C
+there sends SIGINT to all of them: every shard exits 130, `run-batch.sh`
+returns non-zero, and the driver logs `chunk <i> FAILED` and stops. Observed
+12 Oct 2026, when p3 chunk 4 died 11 s after the display was interrupted.
+Git Bash has no `setsid`, so the current script cannot detach the run from
+the window. Until it does (e.g. by starting the driver as a separate Windows
+process), **leave the `phase2.sh` window open and never Ctrl-C it**. Closing
+it is untested; assume it kills the run as well. A Ctrl-C in a second window
+running `progress.sh` is harmless. If it happens anyway, nothing completed is
+lost: re-run `./batch/phase2.sh <arm>` and the interrupted chunk is redone.
 
 ### Replication volume
 
@@ -265,9 +280,10 @@ ls target/nidm-4.0.1.jar target/classes
 platform in `batch-info.txt`, and copies the source `config.properties` next
 to it. Launch the full run with `./batch/phase2.sh p3` (set `SHARDS=<physical
 cores>` in the environment if that is not 16; it must be ≥ 6). The driver
-detaches itself with `nohup`, so closing the window or Ctrl-C stops only the
-progress display; after a reboot, re-run the same command to resume (see
-"Chunked driver"). A bare `run-batch.sh` call, by contrast, needs a shell that
+runs under `nohup` but, on Git Bash, stays in the window's process group:
+leave the window open and do not Ctrl-C it (see "Ctrl-C in the `phase2.sh`
+window kills the run"). After a reboot, re-run the same command to resume
+(see "Chunked driver"). A bare `run-batch.sh` call, by contrast, needs a shell that
 survives the whole run (`nohup`/`tmux`/`screen`) and loses everything on a
 restart. `--shards` / `SHARDS` should not exceed the number of physical cores
 (see "Why it shards").

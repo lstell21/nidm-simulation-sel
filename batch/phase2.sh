@@ -6,10 +6,18 @@
 #   ./batch/phase2.sh runA
 #
 # Starts the run detached if it is not already going, then follows progress in
-# this window. Ctrl-C stops watching only -- the run keeps going. Re-running the
-# same command re-attaches rather than starting a second copy, and if the run
-# died (reboot, someone shut the box down) it resumes from the last completed
-# chunk.
+# this window. Re-running the same command re-attaches rather than starting a
+# second copy, and if the run died (reboot, someone shut the box down, Ctrl-C)
+# it resumes from the last completed chunk.
+#
+# DO NOT Ctrl-C OR CLOSE THIS WINDOW while the run is going. On Git Bash
+# (Windows) Ctrl-C kills the run, not just the display: the driver is started
+# with nohup in the background of this non-interactive script, so it stays in
+# the window's process group, and the Java shards are killed with SIGINT
+# (exit 130). Seen 12 Oct 2026: chunk 4 of p3 died 11 s after a Ctrl-C.
+# Git Bash has no setsid to detach it properly. Closing the window is untested
+# here; assume it kills the run too. Watch from a second window with
+# ./batch/progress.sh <arm> instead; Ctrl-C there is harmless.
 #
 # Env: INTERVAL (300) seconds between refreshes.
 #
@@ -17,8 +25,8 @@
 # instead of cat/clear, a fork-light progress.sh): on this Windows host every
 # process that exits stays pinned in kernel memory until reboot, and the old
 # 60-second loop leaked ~30 GB a day -- enough to stall chunk 4 of every run.
-# Still, there is no need to leave it open for days: Ctrl-C after the first
-# screen and check in with ./batch/progress.sh <arm> now and then.
+# A long INTERVAL (e.g. INTERVAL=3600) keeps the leak negligible for a
+# multi-day run in an open window.
 
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -64,17 +72,18 @@ else
         exit 1
     fi
     echo "started $ARM (pid $(cat "$PIDF"))"
-    echo "safe to Ctrl-C: that stops the display, not the run."
+    echo "leave this window open. Ctrl-C or closing it KILLS THE RUN (Git Bash);"
+    echo "watch from a second window with ./batch/progress.sh $ARM"
     sleep 3
 fi
 
-trap 'printf "\n\nstopped watching. %s continues in the background.\n  re-attach: ./batch/phase2.sh %s\n" "$ARM" "$ARM"; exit 0' INT
+trap 'printf "\n\nstopped watching. On Git Bash the Ctrl-C has most likely killed the shards too:\n  check ./batch/progress.sh %s (rc=130) and %s; resume with ./batch/phase2.sh %s\n" "$ARM" "$LOG" "$ARM"; exit 0' INT
 
 while true; do
     printf '\033[H\033[2J'      # clear, without forking clear(1)
     "$REPO/batch/progress.sh" "$ARM"
     echo
-    echo "refreshing every ${INTERVAL}s -- Ctrl-C stops watching, not the run"
+    echo "refreshing every ${INTERVAL}s -- do NOT Ctrl-C or close this window: that kills the run"
 
     if ! alive; then
         echo
