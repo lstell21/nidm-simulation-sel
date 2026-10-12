@@ -117,9 +117,11 @@ check above. For a multi-day run start the display with a long refresh
 Git Bash on this machine. A reboot clears the leak, so rebooting between runs
 is cheap insurance.
 
-### Ctrl-C in the `phase2.sh` window kills the run (Git Bash)
+### Ctrl-C in the `phase2.sh` window kills the run (Git Bash), every arm including `p3`
 
-`phase2.sh` starts the driver with `nohup … &` from a non-interactive script,
+Despite the name, `phase2.sh` and `run-phase2.sh` drive every arm: `runA`,
+`runB` and the Phase 3 arm `p3`. This section and "Zombie processes" apply to
+all of them. `phase2.sh` starts the driver with `nohup … &` from a non-interactive script,
 so the driver and its Java shards stay in the window's process group. Ctrl-C
 there sends SIGINT to all of them: every shard exits 130, `run-batch.sh`
 returns non-zero, and the driver logs `chunk <i> FAILED` and stops. Observed
