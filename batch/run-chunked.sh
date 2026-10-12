@@ -21,9 +21,9 @@
 # scratch. Re-running this script skips completed chunks. Safe to run repeatedly.
 #
 # Usage:
-#   nohup ./batch/run-phase2.sh runA > /dev/null 2>&1 &
-#   nohup ./batch/run-phase2.sh runB > /dev/null 2>&1 &
-#   nohup ./batch/run-phase2.sh p3   > /dev/null 2>&1 &
+#   nohup ./batch/run-chunked.sh runA > /dev/null 2>&1 &
+#   nohup ./batch/run-chunked.sh runB > /dev/null 2>&1 &
+#   nohup ./batch/run-chunked.sh p3   > /dev/null 2>&1 &
 #
 #   runA = omega ~ U[0,1]   runB = omega fixed at 0
 #   p3   = omega ~ U[0,1], gamma ~ U[0.1,0.2], nb.ep.structure=both
@@ -49,7 +49,7 @@
 # that do not fit page each other to a crawl rather than fail -- chunk 4 of
 # runA, runB and p3 all stalled that way, after a leak elsewhere had eaten the
 # headroom (README -> "Zombie processes"). Stopping with a message loses
-# nothing: reboot, then re-run phase2.sh to resume from the same chunk.
+# nothing: reboot, then re-run start.sh to resume from the same chunk.
 
 set -u
 
@@ -84,7 +84,7 @@ case "$ARM" in
 esac
 
 # Two drivers writing the same staging directory would corrupt it. The guard has
-# to live here rather than in phase2.sh, or launching run-phase2.sh directly
+# to live here rather than in start.sh, or launching run-chunked.sh directly
 # leaves no record and the wrapper cheerfully starts a second copy on top.
 if [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF" 2>/dev/null)" 2>/dev/null; then
     echo "$ARM is already running as pid $(cat "$PIDF") -- refusing to start a second driver" >&2

@@ -36,7 +36,7 @@ differs between runs.
     --gamma-min 0.1 --gamma-max 0.2 --omega-random --ep-structure both --no-centralities
 # ...but launch it through the chunked driver (next section), which runs it as
 # 5 x 2000 with resume:
-./batch/phase2.sh p3
+./batch/start.sh p3
 # See "Phase 3" below for what a BOTH batch writes, the pre-flight smoke test,
 # and why the analysis repo's readers must be extended before it can be read.
 
@@ -55,9 +55,9 @@ chunked driver, because `run-batch.sh` has no resume and the Windows box
 restarts for updates. Phase 3, at several days, goes the same way:
 
 ```sh
-./batch/phase2.sh runA    # starts batch-runs/runA detached, or re-attaches/resumes
-./batch/phase2.sh runB
-./batch/phase2.sh p3      # omega random, gamma U[0.1,0.2], --ep-structure both
+./batch/start.sh runA    # starts batch-runs/runA detached, or re-attaches/resumes
+./batch/start.sh runB
+./batch/start.sh p3      # omega random, gamma U[0.1,0.2], --ep-structure both
 ./batch/progress.sh p3    # one-off progress snapshot without attaching
 ```
 
@@ -67,7 +67,7 @@ restarts for updates. Phase 3, at several days, goes the same way:
 | `runB` | `--omega 0` | same as `runA` |
 | `p3` | `--omega-random --gamma-min 0.1 --gamma-max 0.2 --ep-structure both` | `data/phase3/split` + `data/phase3/provenance`; **deletes nothing**, and refuses (exit 1) if `data/phase3/split` exists and is not empty |
 
-`run-phase2.sh` (started detached by `phase2.sh`) runs the arm as `CHUNKS` ×
+`run-chunked.sh` (started detached by `start.sh`) runs the arm as `CHUNKS` ×
 `REPS` (default 5 × 2,000 per N) calls to `run-batch.sh` under
 `batch-runs/<arm>/c<i>/`, stages every chunk's shard directories as
 `batch-runs/<arm>/merged/c<i>-n<N>-s<k>`, and keeps each chunk's
@@ -84,7 +84,7 @@ hand. `progress.sh <arm>` prints per-shard progress and a slowest-shard ETA.
 `.done` is written last, after `run-batch.sh` returned 0, every shard listed in
 the chunk's `shard-list.txt` left an `exit.code` and all of them are 0, and the
 chunk's shard directories and provenance files were staged. Re-running
-`./batch/phase2.sh <arm>` (after a reboot, say) skips chunks with `.done`,
+`./batch/start.sh <arm>` (after a reboot, say) skips chunks with `.done`,
 deletes a chunk directory without one along with its staged `c<i>-*` entries,
 and re-runs that chunk from scratch. At most one chunk is lost.
 
@@ -92,7 +92,7 @@ and re-runs that chunk from scratch. At most one chunk is lost.
 refuses to start the chunk (`chunk <i> NOT STARTED: … MB free, need … MB` in
 `driver.log`, exit 1) below `MIN_FREE_MB`, by default `SHARDS × (heap +
 512 MB) + 4 GB` = 45,056 MB at 16 × 2g. Sixteen shards that do not fit do not
-fail; they page each other to a crawl. Reboot, then re-run `phase2.sh` to
+fail; they page each other to a crawl. Reboot, then re-run `start.sh` to
 resume. `MIN_FREE_MB=0` disables the check.
 
 ### Zombie processes: do not leave a watch loop running for days
@@ -103,35 +103,56 @@ presumably the security software), at ~55 KB each, until the next reboot.
 Measured 12 Oct 2026: 200 calls of the old `progress.sh`, which forked ~380
 MSYS processes per call (`cat`, `grep`, `wc`, `ls` per shard and every
 `$(...)`), added 75,000 process objects and took 4.3 GB of available memory.
-The `phase2.sh` display called it every 60 s, i.e. ~30 GB a day. With
+The display (then `phase2.sh`) called it every 60 s, i.e. ~30 GB a day. With
 16 × 2 GB of shard heaps on a 63 GB box, that ran out around day 1.5, so
 **chunk 4 of Run A, Run B and Phase 3 all stalled in paging** (Run A ~58 h,
 Run B ~18 h, p3 24 h at 14% before the machine was restarted unresponsive).
 
 Fixed by: `progress.sh` forking one `awk` per call (~4 processes including
-its own shell, ~85× fewer; output unchanged); `phase2.sh` refreshing every
+its own shell, ~85× fewer; output unchanged); `start.sh` refreshing every
 300 s instead of 60 (`INTERVAL`) without forking `cat`/`clear`; and the memory
 check above. For a multi-day run start the display with a long refresh
-(`INTERVAL=3600 ./batch/phase2.sh <arm>`), check in from a second window with
+(`INTERVAL=3600 ./batch/start.sh <arm>`), check in from a second window with
 `./batch/progress.sh <arm>`, and avoid other long-running polling loops in
 Git Bash on this machine. A reboot clears the leak, so rebooting between runs
 is cheap insurance.
 
-### Ctrl-C in the `phase2.sh` window kills the run (Git Bash), every arm including `p3`
+### Ctrl-C in the launch window (Git Bash), every arm including `p3`
 
-Despite the name, `phase2.sh` and `run-phase2.sh` drive every arm: `runA`,
-`runB` and the Phase 3 arm `p3`. This section and "Zombie processes" apply to
-all of them. `phase2.sh` starts the driver with `nohup … &` from a non-interactive script,
-so the driver and its Java shards stay in the window's process group. Ctrl-C
-there sends SIGINT to all of them: every shard exits 130, `run-batch.sh`
-returns non-zero, and the driver logs `chunk <i> FAILED` and stops. Observed
-12 Oct 2026, when p3 chunk 4 died 11 s after the display was interrupted.
-Git Bash has no `setsid`, so the current script cannot detach the run from
-the window. Until it does (e.g. by starting the driver as a separate Windows
-process), **leave the `phase2.sh` window open and never Ctrl-C it**. Closing
-it is untested; assume it kills the run as well. A Ctrl-C in a second window
-running `progress.sh` is harmless. If it happens anyway, nothing completed is
-lost: re-run `./batch/phase2.sh <arm>` and the interrupted chunk is redone.
+`start.sh` and `run-chunked.sh` (until 12 Oct 2026 `phase2.sh` and
+`run-phase2.sh`) drive every arm: `runA`, `runB` and the Phase 3 arm `p3`.
+This section and "Zombie processes" apply to all of them.
+
+**What happened.** `phase2.sh` started the driver with `nohup … &`. On
+12 Oct 2026 a Ctrl-C in its window killed p3 chunk 4 eleven seconds after
+the chunk started: every shard exited 130, `run-batch.sh` returned non-zero,
+and the driver logged `chunk 4 FAILED` and stopped. A SIGINT sent to the
+script's process group did **not** reproduce this, so the Ctrl-C most likely
+reaches the Java shards as a Windows console event (CTRL_C_EVENT goes to every
+native process attached to the window's console), not as a POSIX signal.
+`nohup` does not protect against that.
+
+**What `start.sh` does now.** On Git Bash it starts the driver as a separate,
+hidden Windows process (`powershell Start-Process -WindowStyle Hidden`), with
+its own console, so neither Ctrl-C nor closing the launch window should reach
+it. Elsewhere it uses `setsid`. `DETACH=0` restores the old attached launch,
+and the script then warns that Ctrl-C kills the run. **Not yet verified with a
+real Ctrl-C** (it cannot be tested from inside a Claude Code session). Test it
+once, with nothing else running, before relying on it:
+
+```sh
+CHUNKS=1 REPS=300 SHARDS=1 NGRID=80 INSTALL=0 INTERVAL=5 ./batch/start.sh p3
+# wait for the first progress screen, press Ctrl-C, close the window, then
+# from a new window:
+./batch/progress.sh p3             # n80-s1 must still be "running"
+```
+
+Run the test only while no real `p3` batch exists (it uses `batch-runs/p3`),
+and move `batch-runs/p3` aside afterwards. Until the test passes, treat the
+launch window as before: leave it open and do not Ctrl-C it. A Ctrl-C in a
+second window running `progress.sh` is always harmless. If it happens anyway,
+nothing completed is lost: re-run `./batch/start.sh <arm>` and the interrupted
+chunk is redone.
 
 ### Replication volume
 
@@ -234,7 +255,7 @@ the longer wall clock accordingly.
 
 ### After the run
 
-If `phase2.sh p3` ran on the analysis machine itself, the driver has already
+If `start.sh p3` ran on the analysis machine itself, the driver has already
 installed the data into `data/phase3/split` and `data/phase3/provenance`.
 Otherwise (compute machine, no analysis repo next to the clone) it stages
 only; package the staged arm and unpack it on the analysis machine:
@@ -280,11 +301,11 @@ ls target/nidm-4.0.1.jar target/classes
 
 `run-batch.sh` picks the classpath separator from `uname`, records the
 platform in `batch-info.txt`, and copies the source `config.properties` next
-to it. Launch the full run with `./batch/phase2.sh p3` (set `SHARDS=<physical
+to it. Launch the full run with `./batch/start.sh p3` (set `SHARDS=<physical
 cores>` in the environment if that is not 16; it must be ≥ 6). The driver
-runs under `nohup` but, on Git Bash, stays in the window's process group:
-leave the window open and do not Ctrl-C it (see "Ctrl-C in the `phase2.sh`
-window kills the run"). After a reboot, re-run the same command to resume
+is started detached from the window, but on Git Bash that is not yet verified
+against a real Ctrl-C: until it is, leave the window open and do not Ctrl-C it
+(see "Ctrl-C in the launch window"). After a reboot, re-run the same command to resume
 (see "Chunked driver"). A bare `run-batch.sh` call, by contrast, needs a shell that
 survives the whole run (`nohup`/`tmux`/`screen`) and loses everything on a
 restart. `--shards` / `SHARDS` should not exceed the number of physical cores

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Live progress for a Phase 2 or Phase 3 batch driven by run-phase2.sh.
+# Live progress for a Phase 2 or Phase 3 batch driven by run-chunked.sh.
 #
 # run-batch.sh prints its per-shard results only after the wait loop returns, so
 # driver.log goes quiet for the length of a chunk. The shards themselves write
@@ -9,7 +9,7 @@
 #
 # Usage:  ./batch/progress.sh [runA|runB|p3]
 #
-# For a live view use ./batch/phase2.sh <arm>, which calls this every INTERVAL
+# For a live view use ./batch/start.sh <arm>, which calls this every INTERVAL
 # seconds.
 #
 # Written to fork as little as possible: one awk for all row counts, everything
@@ -17,7 +17,7 @@
 # Windows host every MSYS process that exits leaves a zombie process object
 # pinned by a kernel-mode component (presumably security software) until the
 # next reboot, at ~55 KB each. The earlier version forked ~380 processes per
-# call; called every 60 s by the phase2.sh watcher that pinned ~30 GB of RAM
+# call; called every 60 s by the start.sh watcher that pinned ~30 GB of RAM
 # a day and drove the box into paging on chunk 4 of runA, runB and p3
 # (measured 12 Oct 2026: 200 calls -> +75,000 process objects, -4.3 GB
 # available). See batch/README.md -> "Zombie processes".
