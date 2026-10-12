@@ -42,6 +42,14 @@
 #   CHUNKS (5)  REPS (2000)  SHARDS (16)  HEAP (2g)
 #   NGRID (80,160,240,320,400,480)
 #   ANALYSIS (../SelSWIDM-analysis)   INSTALL (1; set 0 to stage only)
+#   MIN_FREE_MB (SHARDS x (heap + 512 MB) + 4096; 0 disables the check)
+#
+# Memory check: before each chunk the driver reads the free physical memory
+# and refuses to start the chunk if it is below MIN_FREE_MB. Sixteen shards
+# that do not fit page each other to a crawl rather than fail -- chunk 4 of
+# runA, runB and p3 all stalled that way, after a leak elsewhere had eaten the
+# headroom (README -> "Zombie processes"). Stopping with a message loses
+# nothing: reboot, then re-run phase2.sh to resume from the same chunk.
 
 set -u
 
@@ -87,6 +95,25 @@ trap 'rm -f "$PIDF"' EXIT
 
 say() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG"; }
 
+# Free physical memory in MB into $1, from /proc/meminfo (Linux and Git Bash
+# both have it; Git Bash's MemFree is Windows' "available"). Builtins only.
+free_mb() {
+    local k v _ free=-1
+    while read -r k v _; do
+        case "$k" in
+            MemAvailable:) free=$v; break ;;
+            MemFree:) free=$v ;;
+        esac
+    done < /proc/meminfo 2>/dev/null
+    printf -v "$1" '%d' $(( free < 0 ? -1 : free / 1024 ))
+}
+case "$HEAP" in
+    *[gG]) HEAP_MB=$(( ${HEAP%[gG]} * 1024 )) ;;
+    *[mM]) HEAP_MB=${HEAP%[mM]} ;;
+    *)     HEAP_MB=2048 ;;
+esac
+MIN_FREE_MB="${MIN_FREE_MB:-$(( SHARDS * (HEAP_MB + 512) + 4096 ))}"
+
 say "=== $ARM: $CHUNKS chunks x $REPS reps, shards=$SHARDS heap=$HEAP ==="
 say "    grid $NGRID"
 say "    flags $ARM_FLAGS --no-centralities"
@@ -100,7 +127,14 @@ for i in $(seq 1 "$CHUNKS"); do
         continue
     fi
 
-    say "chunk $i/$CHUNKS starting"
+    free_mb FREE
+    if [ "$MIN_FREE_MB" -gt 0 ] && [ "$FREE" -ge 0 ] && [ "$FREE" -lt "$MIN_FREE_MB" ]; then
+        say "chunk $i NOT STARTED: ${FREE} MB free, need ${MIN_FREE_MB} MB for $SHARDS shards at $HEAP"
+        say "reboot (frees memory pinned by exited processes), then re-run this script to resume from chunk $i"
+        exit 1
+    fi
+
+    say "chunk $i/$CHUNKS starting (${FREE} MB free)"
     rm -rf "$OUT"
 
     if ! "$REPO/batch/run-batch.sh" \

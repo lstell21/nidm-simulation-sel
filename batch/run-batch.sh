@@ -132,6 +132,10 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$OUT" ] || OUT="$REPO/batch-runs/$(date +%Y%m%d-%H%M%S)"
+# Each shard cd's into its work directory before writing shard.log, exit.code
+# and the conf classpath entry, so a relative --out made every shard fail
+# before Java started (found in the Phase 3 smoke test, 9 Oct 2026).
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 SRC_CONF="$REPO/src/main/resources/config.properties"
 
 [ -f "$SRC_CONF" ] || { echo "missing $SRC_CONF" >&2; exit 1; }

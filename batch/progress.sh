@@ -9,28 +9,58 @@
 #
 # Usage:  ./batch/progress.sh [runA|runB|p3]
 #
-# There is no `watch` in Git Bash on this host, so for a live view:
-#   while true; do clear; ./batch/progress.sh runA; sleep 60; done
+# For a live view use ./batch/phase2.sh <arm>, which calls this every INTERVAL
+# seconds.
+#
+# Written to fork as little as possible: one awk for all row counts, everything
+# else bash builtins (no $(...), cat, grep, wc, ls, basename or date). On this
+# Windows host every MSYS process that exits leaves a zombie process object
+# pinned by a kernel-mode component (presumably security software) until the
+# next reboot, at ~55 KB each. The earlier version forked ~380 processes per
+# call; called every 60 s by the phase2.sh watcher that pinned ~30 GB of RAM
+# a day and drove the box into paging on chunk 4 of runA, runB and p3
+# (measured 12 Oct 2026: 200 calls -> +75,000 process objects, -4.3 GB
+# available). See batch/README.md -> "Zombie processes".
 
 set -u
-REPO=$(cd "$(dirname "$0")/.." && pwd)
+REPO="${BASH_SOURCE[0]%/*}/.."
 ARM="${1:-runA}"
 ROOT="$REPO/batch-runs/$ARM"
 
 [ -d "$ROOT" ] || { echo "no batch at $ROOT"; exit 1; }
 
-now=$(date +%s)
-hms() { printf '%d:%02d:%02d' $(($1 / 3600)) $((($1 % 3600) / 60)) $(($1 % 60)); }
+printf -v now '%(%s)T' -1
+hms() { printf -v "$1" '%d:%02d:%02d' $(($2 / 3600)) $((($2 % 3600) / 60)) $(($2 % 60)); }
 
 done_chunks=0; active=""
 for c in "$ROOT"/c*/; do
     [ -d "$c" ] || continue
-    if [ -f "$c/.done" ]; then done_chunks=$((done_chunks + 1)); else active="$c"; fi
+    if [ -f "$c/.done" ]; then done_chunks=$((done_chunks + 1)); else active="${c%/}"; fi
 done
 
-staged=$(for f in "$ROOT"/merged/*/data/nunnerbuskens/simulation-summary.csv; do
-             [ -f "$f" ] && wc -l < "$f"; done 2>/dev/null |
-         awk '{s += $1 - 1} END {print s + 0}')
+# The files whose data rows we need: every staged summary, plus the in-flight
+# shards' own. One awk pass counts them all; "<file> <lines>" per file.
+files=()
+for f in "$ROOT"/merged/*/data/nunnerbuskens/simulation-summary.csv; do
+    [ -f "$f" ] && files+=("$f")
+done
+if [ -n "$active" ]; then
+    for f in "$active"/work/*/exports/*/data/nunnerbuskens/simulation-summary.csv; do
+        [ -f "$f" ] && files+=("$f")
+    done
+fi
+declare -A lines=()
+if [ "${#files[@]}" -gt 0 ]; then
+    while read -r f n; do lines["$f"]=$n; done < <(
+        awk 'FNR == 1 && NR > 1 { print pf, pn } { pf = FILENAME; pn = FNR }
+             END { if (NR) print pf, pn }' "${files[@]}")
+fi
+rows() { local _l=${lines["$1"]:-0}; printf -v "$2" '%d' $(( _l > 0 ? _l - 1 : 0 )); }
+
+staged=0
+for f in "${files[@]}"; do
+    case "$f" in "$ROOT"/merged/*) rows "$f" r; staged=$((staged + r)) ;; esac
+done
 
 echo "$ARM: $done_chunks chunk(s) complete, $staged simulations staged"
 
@@ -39,26 +69,30 @@ if [ -z "$active" ]; then
     exit 0
 fi
 
-echo "  in flight: $(basename "$active")"
+echo "  in flight: ${active##*/}"
 tot_done=0; tot_target=0; earliest=$now; worst=0
 for w in "$active"/work/*/; do
     [ -d "$w" ] || continue
-    name=$(basename "$w")
-    target=$(grep -m1 '^nb.n=' "$w/conf/config.properties" 2>/dev/null | cut -d= -f2)
-    target=${target:-0}
-    f=$(ls "$w"/exports/*/data/nunnerbuskens/simulation-summary.csv 2>/dev/null | head -1)
+    w=${w%/}
+    name=${w##*/}
+    target=0
+    while IFS= read -r l; do
+        case "$l" in nb.n=*) target=${l#nb.n=}; break ;; esac
+    done < "$w/conf/config.properties" 2>/dev/null
     n=0
-    [ -n "$f" ] && n=$(( $(wc -l < "$f") - 1 ))
-    [ "$n" -lt 0 ] && n=0
-    st=$(cat "$w/start.epoch" 2>/dev/null || echo "$now")
+    for f in "$w"/exports/*/data/nunnerbuskens/simulation-summary.csv; do
+        [ -f "$f" ] && { rows "$f" n; break; }
+    done
+    st=$now; [ -f "$w/start.epoch" ] && read -r st < "$w/start.epoch"
     [ "$st" -lt "$earliest" ] && earliest=$st
     if [ -f "$w/exit.code" ]; then
-        en=$(cat "$w/end.epoch" 2>/dev/null || echo "$now")
-        printf '    %-12s %4s/%-5s done  rc=%s  %s\n' \
-            "$name" "$n" "$target" "$(cat "$w/exit.code")" "$(hms $((en - st)))"
+        read -r rc < "$w/exit.code"
+        en=$now; [ -f "$w/end.epoch" ] && read -r en < "$w/end.epoch"
+        hms t $((en - st))
+        printf '    %-12s %4s/%-5s done  rc=%s  %s\n' "$name" "$n" "$target" "$rc" "$t"
     else
-        printf '    %-12s %4s/%-5s running  %s\n' \
-            "$name" "$n" "$target" "$(hms $((now - st)))"
+        hms t $((now - st))
+        printf '    %-12s %4s/%-5s running  %s\n' "$name" "$n" "$target" "$t"
         # The chunk ends when its SLOWEST shard does, so project each shard
         # from its own rate and take the worst. A pooled rate is dominated by
         # the small-N shards, which finish early and flatter the estimate
@@ -72,10 +106,10 @@ for w in "$active"/work/*/; do
 done
 
 if [ "$tot_target" -gt 0 ] && [ "$tot_done" -gt 0 ]; then
-    el=$((now - earliest))
-    pct=$((100 * tot_done / tot_target))
-    echo "  chunk: $tot_done/$tot_target sims (${pct}%), elapsed $(hms $el)"
+    hms el $((now - earliest))
+    echo "  chunk: $tot_done/$tot_target sims ($((100 * tot_done / tot_target))%), elapsed $el"
     if [ "$worst" -gt 0 ]; then
-        echo "  chunk ETA $(hms $worst) (slowest shard)"
+        hms eta "$worst"
+        echo "  chunk ETA $eta (slowest shard)"
     fi
 fi

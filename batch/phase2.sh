@@ -11,7 +11,14 @@
 # died (reboot, someone shut the box down) it resumes from the last completed
 # chunk.
 #
-# Env: INTERVAL (60) seconds between refreshes.
+# Env: INTERVAL (300) seconds between refreshes.
+#
+# The watch loop is kept to a handful of processes per refresh (builtins
+# instead of cat/clear, a fork-light progress.sh): on this Windows host every
+# process that exits stays pinned in kernel memory until reboot, and the old
+# 60-second loop leaked ~30 GB a day -- enough to stall chunk 4 of every run.
+# Still, there is no need to leave it open for days: Ctrl-C after the first
+# screen and check in with ./batch/progress.sh <arm> now and then.
 
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -25,11 +32,15 @@ esac
 ROOT="$REPO/batch-runs/$ARM"
 PIDF="$ROOT/driver.pid"
 LOG="$ROOT/driver.log"
-INTERVAL="${INTERVAL:-60}"
+INTERVAL="${INTERVAL:-300}"
 
 mkdir -p "$ROOT"
 
-alive() { [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF" 2>/dev/null)" 2>/dev/null; }
+alive() {
+    local pid=
+    [ -f "$PIDF" ] && read -r pid < "$PIDF" 2>/dev/null
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
 finished() { grep -q "=== $ARM complete:" "$LOG" 2>/dev/null; }
 
 if alive; then
@@ -60,7 +71,7 @@ fi
 trap 'printf "\n\nstopped watching. %s continues in the background.\n  re-attach: ./batch/phase2.sh %s\n" "$ARM" "$ARM"; exit 0' INT
 
 while true; do
-    clear 2>/dev/null || true
+    printf '\033[H\033[2J'      # clear, without forking clear(1)
     "$REPO/batch/progress.sh" "$ARM"
     echo
     echo "refreshing every ${INTERVAL}s -- Ctrl-C stops watching, not the run"

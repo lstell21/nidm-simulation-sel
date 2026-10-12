@@ -88,6 +88,34 @@ chunk's shard directories and provenance files were staged. Re-running
 deletes a chunk directory without one along with its staged `c<i>-*` entries,
 and re-runs that chunk from scratch. At most one chunk is lost.
 
+**Memory check.** Before each chunk the driver reads free physical memory and
+refuses to start the chunk (`chunk <i> NOT STARTED: … MB free, need … MB` in
+`driver.log`, exit 1) below `MIN_FREE_MB`, by default `SHARDS × (heap +
+512 MB) + 4 GB` = 45,056 MB at 16 × 2g. Sixteen shards that do not fit do not
+fail; they page each other to a crawl. Reboot, then re-run `phase2.sh` to
+resume. `MIN_FREE_MB=0` disables the check.
+
+### Zombie processes: do not leave a watch loop running for days
+
+On USELAB02 every process that exits stays behind as a zombie process object,
+pinned by some kernel-mode component (no user-mode process holds the handles;
+presumably the security software), at ~55 KB each, until the next reboot.
+Measured 12 Oct 2026: 200 calls of the old `progress.sh`, which forked ~380
+MSYS processes per call (`cat`, `grep`, `wc`, `ls` per shard and every
+`$(...)`), added 75,000 process objects and took 4.3 GB of available memory.
+The `phase2.sh` display called it every 60 s, i.e. ~30 GB a day. With
+16 × 2 GB of shard heaps on a 63 GB box, that ran out around day 1.5, so
+**chunk 4 of Run A, Run B and Phase 3 all stalled in paging** (Run A ~58 h,
+Run B ~18 h, p3 24 h at 14% before the machine was restarted unresponsive).
+
+Fixed by: `progress.sh` forking one `awk` per call (~4 processes including
+its own shell, ~85× fewer; output unchanged); `phase2.sh` refreshing every
+300 s instead of 60 (`INTERVAL`) without forking `cat`/`clear`; and the memory
+check above. Still: Ctrl-C the display once the run has started, check in
+with `./batch/progress.sh <arm>` now and then, and avoid other long-running
+polling loops in Git Bash on this machine. A reboot clears the leak, so
+rebooting between runs is cheap insurance.
+
 ### Replication volume
 
 10,000 per level, decided 27 Aug 2026. That is ~2.5 days per Phase 2 run at
