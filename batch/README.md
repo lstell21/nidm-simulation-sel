@@ -183,8 +183,16 @@ supplies that counterfactual within the same run: the generator grows the
 pre-epidemic network, seeds one index case, runs the epidemic once on the
 **frozen** network (no tie formation or dissolution while an infection is
 active — `Simulation.java:300`), resets the disease states, and then runs it
-again from the **same index case on the same network** with the network
-dynamic (`NunnerBuskensDataGenerator.java:464-475`). Each simulation therefore
+again from the **same index case** with the network dynamic
+(`NunnerBuskensDataGenerator.java:464-475`). The starting network of the
+dynamic arm is the pre-epidemic network **after one round of tie revisions**:
+in the round in which the static outbreak ends, the infection is marked
+defeated and agents revise ties in that same round, also in the static arm
+(`Simulation.java:296-302`), and the generator reuses the network object. In
+Phase 3 this changed 86–88 % of starting networks, by small amounts that do not
+depend on `s` (mean |Δ| degree ≈ 0.03 at degree ≈ 7.7, clustering and
+assortativity ≈ 0.004–0.005; no infection is present in that round, so
+selection does not act). Each simulation therefore
 yields a paired outcome: `net.static.pct.rec` (no adaptation) against
 `net.dynamic.pct.rec` (adaptation, selective or random according to `s`).
 The static arm does not depend on `s` (selection acts only while an infection
@@ -205,7 +213,8 @@ show instead a peak at α ≈ 0.4–0.5 for γ ≤ 0.25 (binned, γ 0.10–0.15:
 [0.1, 0.2] with α left at U[0, 1] — the α ~ U[0, 0.3] first planned would miss
 the high-α crossover of the one reading and the peak and decline of the other.
 Phase 3 then measures the shape directly: the static arm traces outbreak size
-along α with no contact adaptation, on the same networks as the dynamic arm.
+along α with no contact adaptation, on the pre-epidemic networks the dynamic
+arm starts from (up to the one revision round described above).
 ω stays random (as Run A) so the ω gradient can be re-read with the static
 counterfactual alongside.
 
@@ -214,18 +223,17 @@ counterfactual alongside.
 | file | change against a dynamic batch |
 |---|---|
 | `simulation-summary.csv` | `nb.ep.structure` is `both` in every row. The `net.static.*` block (`net.static.pct.rec`, `net.static.epidemic.duration`, `net.static.epidemic.peak.size`, `net.static.av.clustering.post`, …) is populated instead of empty; `net.dynamic.*` as before. `net.*.pre.epidemic.*` describes the one shared pre-epidemic network. |
-| `round-summary.csv` | `nb.ep.structure` is `static` or `dynamic` **per round** (`NunnerBuskensRoundSummaryWriter.java:79`). Every `sim.cnt` has two `ACTIVE_EPIDEMIC` stretches in `sim.stage`: the static one directly after the burn-in, the dynamic one directly after the static one ends (no post-epidemic phase in between; `sim.round` keeps counting). The dynamic outbreak therefore does **not** start at round ζ+1 = 11. |
+| `round-summary.csv` | `nb.ep.structure` is `static` or `dynamic` **per round** (`NunnerBuskensRoundSummaryWriter.java:79`). Every `sim.cnt` has two `active-epidemic` stretches in `sim.stage` (values are lower-case in the CSV): the static one directly after the burn-in, then one `stopped-epidemic` round still labelled `static` (the tie-revision round described above), then the dynamic one (no post-epidemic phase in between; `sim.round` keeps counting). The dynamic outbreak therefore does **not** start at round ζ+1 = 11. |
 | `config.properties` (per shard) | `nb.ep.structure=both` |
 
-What this means for `SelSWIDM-analysis`: `assert_dynamic_only()` in
-`R/00_data-wrangling.R` stops on any value other than `dynamic`, by design.
-Before Phase 3 data can be read, the analysis needs (1) a new entry in
+What this meant for `SelSWIDM-analysis` (implemented 9 Oct 2026 as design
+`p3`; `assert_structure()` replaces the dynamic-only guard): the analysis needed (1) a new entry in
 `DESIGNS` (e.g. `p3 = list(split = "./data/phase3/split", prefix = "./data/phase3/")`
 with the structure named), (2) an outcome switch in the model-fitting helpers
 so `net.static.pct.rec` can be modelled alongside `net.dynamic.pct.rec`, and
 (3) round-summary helpers that take the phase from the per-round
 `nb.ep.structure` column and re-index time within the dynamic phase
-(`sim.round − first dynamic ACTIVE_EPIDEMIC round + ζ`) instead of assuming
+(`sim.round − first dynamic active-epidemic round + ζ`) instead of assuming
 one active-epidemic stretch per `sim.cnt`. None of this touches the Java.
 
 ### Pre-flight smoke test (do this before the 3-day run)
@@ -239,10 +247,11 @@ Then confirm, on `batch-runs/p3-smoke/split/n80-s1/data/nunnerbuskens/`:
 
 1. `simulation-summary.csv`: 2 rows; `nb.ep.structure == both`;
    `net.static.pct.rec` and `net.dynamic.pct.rec` both numeric and generally
-   different; `nb.gamma` within [0.1, 0.2]; `nb.phi` = 0.202532 at N = 80.
+   different; `nb.gamma` within [0.1, 0.2]. `nb.phi` is not a summary column:
+   check it in each shard's `config.properties` (0.202532 at N = 80).
 2. `round-summary.csv`: per `sim.cnt` (rows where `sim.round == 1` start a new
    simulation), the sequence of `nb.ep.structure` is `static…` then
-   `dynamic…`; `sim.stage` shows two `ACTIVE_EPIDEMIC` stretches.
+   `dynamic…`; `sim.stage` shows two `active-epidemic` stretches.
 3. `batch-info.txt` in the run root records the full command line, the
    ep-structure/γ/ω overrides, and the git commit the jar was built from.
 
@@ -453,7 +462,7 @@ summary schema.
   added on 8 Oct 2026) removes from the wrong list.** The statement reads
   `allAgentsAssorted.removeAll(distance2AgentsShuffled);` where
   `allAgentsShuffled.removeAll(distance2AgentsShuffled);` was evidently intended
-  (lines 1073-1076 build the shuffled pool; line 1071 already stripped the
+  (lines 1073-1075 build the shuffled pool; line 1071 already stripped the
   distance-2 agents from the assorted one). Consequence: in the non-assorted
   branch (`randOmega > omega`) the "random others" pool still contains
   second-degree neighbours, while the assorted pool has them removed twice.
@@ -463,44 +472,51 @@ summary schema.
   with this behaviour. Decision 8 Oct 2026: document, do not change, so that
   Phase 3 stays comparable with Runs A and B. A matching comment sits above the
   statement in `Agent.java`.
-- **Encounter category is drawn per decision, not as Binomial counts.** The
+- **Encounter categories are drawn per decision, not as up-front counts.** The
   code draws one category per network decision with probabilities ψ, ξ and
-  1−ψ−ξ (`randPsi` at `Agent.java` 1116/1125/1134) and falls through to "all
-  agents" when the chosen list is empty, whereas manuscript Algorithm 5 draws
-  Binomial(φ, ψ) and Binomial(φ, ξ) counts up front. The two are the same in
-  expectation but not in realisation (the per-decision draw has larger
-  variance in the category counts and the empty-list fall-through shifts mass
-  toward "all agents" for sparsely connected agents).
+  1−ψ−ξ (`randPsi` drawn at `Agent.java` 1101; branches at 1115, 1124 and
+  1134), without replacement, and a decision whose list is exhausted falls
+  through to the "all agents" pool (1134: `drawBase == null ||
+  drawBase.isEmpty() || …`). Manuscript Algorithm 5 (`30_model.tex` 160–184)
+  draws n_neighs ~ Binomial(φ, ψ) and n_neighs² ~ Binomial(φ, ξ) up front,
+  clamps them to the list lengths (the second also to φ − n_neighs) and gives
+  the remainder to random agents. Before any list is exhausted the code's
+  counts are jointly multinomial with the same Binomial(φ, ψ) and
+  Binomial(φ, ξ) marginals; Algorithm 5 draws the two counts independently and
+  then clamps, which at φ = 16, ψ = 0.4, ξ = 0.2 binds in 0.4 % of draws. Both
+  route decisions an exhausted list cannot serve to the remaining agents. The
+  pools differ: Algorithm 5's random pool excludes only the agent itself, the
+  code's excludes first- and second-degree neighbours (subject to the bug in
+  the previous bullet). Algorithm 5 line 184 also writes n_{n_1}, n_{n_2} for
+  n_neighs, n_neighs².
 - **`Agent.java` line 1123 (now 1134) duplicates a condition.** The test reads
   `(randPsi > psi+xi) && (randPsi > psi+xi)`; the second conjunct repeats the
   first. Harmless — it evaluates identically to the single condition.
 
 ## Open
 
-- **Confirm the preprint's φ design from Hendrik's run directories.** Confirm
-  from Hendrik's run directories that the preprint batch used flat
-  `nb.phi = 0.20`. This README currently states it as fact (Run A comment,
-  Deltas table), but the claim is "most likely" at best: it rests on the
-  committed `config.properties`, not on the preprint's own run configs.
+- **Confirm the preprint's φ design from Hendrik's run directories.** The Run A
+  comment, the Deltas table and Appendix B.4 of the manuscript state that the
+  preprint batch used a flat `nb.phi = 0.20`. The only basis recorded here is
+  the inherited `config.properties` value in the Deltas table ("was" column);
+  the preprint's own run configurations have not been checked.
 - **`nb.d1` vs `nb.d`.** The analysis regresses on `nb.d1` and builds its
   descriptives from `nb.d1` and `nb.d2`; `_targets.R` plots `pred = "nb.d1"` for
   the manuscript's Figures 1a/1b. None of those exist after `3ad9972`
   (18 Jul 2024), which emits `nb.d`. Both Phase 2 runs are regenerated from this
   branch, so they carry `nb.d`: the analysis needs porting either way, and draft
   Table 3 is replaced rather than reproduced. No longer conditional.
-- **Phase 3 readers.** `SelSWIDM-analysis` cannot read a BOTH batch yet
-  (see "Phase 3 — what a BOTH batch writes"). The reader work can proceed on
-  the smoke-test output while the full batch runs.
 - **Phase 3 adaptivity measure.** The Discussion's explanation, that tightly
   knit structures hamper contact adjustment and let disease persist locally,
   is testable from data already collected: sim.stage marks the active-epidemic
   window, sim.cnt joins to gamma, and degree/clustering/homophily are recorded
   per round. No new instrumentation needed, but the measure is not yet a
   target in SelSWIDM-analysis. In a BOTH batch the window is the *dynamic*
-  `ACTIVE_EPIDEMIC` stretch, not the first one (see the round-summary row of
+  `active-epidemic` stretch, not the first one (see the round-summary row of
   the table above).
-- **Phase 3 cost.** Not yet measured; the smoke test gives it. Budget
-  < 2× a Phase 2 run (~2.5 days at K = 16) until then.
 
 Closed: cost of Phase 2 is measured (see above); phi is ratified as a constant
-16; Phase 3 alpha range settled at U[0,1], gamma at U[0.1, 0.2].
+16; Phase 3 alpha range settled at U[0,1], gamma at U[0.1, 0.2]. Phase 3 ran
+9–13 Oct 2026 (commit `8d23c5c`, five chunks of 10.2–13.4 h, about the cost of a
+Phase 2 run: the frozen arm adds almost nothing); `SelSWIDM-analysis` reads it
+as design `p3`.
