@@ -23,7 +23,7 @@ differs between runs.
 
 ```sh
 # Phase 2 Run A — omega ~ U[0,1]. A re-run, NOT the published data: the published
-# batch used a flat nb.phi, so it is not comparable at N > 80. See "phi" below.
+# batch used the two-weight nb.d1/nb.d2 model. See "phi" below for encounters.
 ./batch/run-batch.sh --reps 10000 --shards 16 --omega-random --no-centralities
 
 # Phase 2 Run B — the isolating run. Identical except omega.
@@ -360,7 +360,7 @@ empty in `run-batch.sh`, and a forgotten flag diverged from Table 1 silently.
 | `nb.sigma.random` / `.max` | `false` (pinned 2.0) / `100.0` | `true` / `3.0` | config |
 | `nb.gamma.random.min` | `0.05` | `0.1` | config |
 | `nb.zeta` | `5` | `10` | config |
-| `nb.phi` | `0.20` flat | 16/(N-1) per level | `--encounters`, now default 16 |
+| `nb.phi` | `0.20` (config default, N = 80) | 16/(N-1) per level | `--encounters`, now default 16 |
 | `nb.n` | `10000` | per run | `--reps` |
 | `nb.N` | `80` | one level per shard | `--ngrid` |
 
@@ -385,6 +385,28 @@ the choice is low-risk either way — measured at N=480, 40 runs per arm, the tw
 regimes are statistically indistinguishable (disconnected 22.5% vs 32.5%,
 z=1.00, p=0.32; mean degree 7.69 vs 7.82). Agents converge to the ~8-tie optimum
 regardless; extra candidates only speed convergence to the same structure.
+
+**The preprint batch also had 16 encounters at every N** (resolved 14 Oct 2026).
+Earlier versions of this README, the Run A comment and Appendix B.4 of the
+manuscript said the preprint used a flat `nb.phi = 0.20` (16 → 96 encounters).
+The only basis for that was the inherited `config.properties`, which covers
+N = 80 alone. The preprint data contradict it. Per agent and epidemic step
+(`net.dynamic.ties.*.epidemic / (N × duration)`), its tie requests, acceptances
+and dissolutions match Run A within 2.5 % at every N:
+
+| N | encounters at flat 0.20 | requests ratio | acceptances ratio | dissolutions ratio |
+|---|---|---|---|---|
+| 80 | 16 | 1.000 | 0.999 | 0.999 |
+| 160 | 32 | 1.000 | 0.998 | 0.999 |
+| 240 | 48 | 1.002 | 1.004 | 1.004 |
+| 320 | 64 | 0.999 | 0.998 | 0.999 |
+| 400 | 80 | 1.008 | 1.024 | 1.023 |
+| 480 | 96 | 0.994 | 0.998 | 0.998 |
+
+Hendrik Nunner confirmed on 14 Oct 2026 that the preprint runs used 16
+encounters per agent and time step at every N. The manuscript's
+encounter-volume argument was withdrawn the same day. Size and contact
+volume were never confounded between the preprint and Runs A/B.
 
 ## Why it shards
 
@@ -495,11 +517,6 @@ summary schema.
 
 ## Open
 
-- **Confirm the preprint's φ design from Hendrik's run directories.** The Run A
-  comment, the Deltas table and Appendix B.4 of the manuscript state that the
-  preprint batch used a flat `nb.phi = 0.20`. The only basis recorded here is
-  the inherited `config.properties` value in the Deltas table ("was" column);
-  the preprint's own run configurations have not been checked.
 - **`nb.d1` vs `nb.d`.** The analysis regresses on `nb.d1` and builds its
   descriptives from `nb.d1` and `nb.d2`; `_targets.R` plots `pred = "nb.d1"` for
   the manuscript's Figures 1a/1b. None of those exist after `3ad9972`
