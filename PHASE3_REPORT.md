@@ -1,12 +1,15 @@
 # Phase 3 batch — compute-machine report
 
-**STATUS: stopped at step 6 (launch).** Steps 1–5 are done and the smoke test
-passed. The full run is **not started**. Claude Code's permission classifier
-blocked the detached launch (details in §6), so you need to start it from a
-Git Bash window yourself, using the one command in §6. §8 (completion) is for
-a separate session.
+**STATUS: done.** Phase 3 completed on 2026-10-13 at 11:06: 60,000
+simulations, 10,000 per N, all 80 shards exit 0, every chunk at commit
+`8d23c5c` with a clean tree. The data is installed in
+`SelSWIDM-analysis/data/phase3/` on USELAB02 and was copied to the analysis
+machine as a zip. Chunk 4 needed four attempts: a memory leak in the progress
+display stalled it, and the fixes are now on the branch (§8, §9).
 
-Written 2026-10-09 by Claude Code on USELAB02.
+Written 2026-10-09 (§1–7) and 2026-10-14 (§8–9) by Claude Code on USELAB02.
+Since §9, `phase2.sh` / `run-phase2.sh` are named `start.sh` /
+`run-chunked.sh`. The old names below are as they were at launch.
 
 ## 1. Machine and repository
 
@@ -241,7 +244,7 @@ here. Run A's install (14:17) was replaced by Run B's 14 minutes later. So
 any `main` result computed from this machine's copy is Run B data. I changed
 nothing there.
 
-## 6. Launch: not done, blocked
+## 6. Launch (done by hand, see §8 for what happened)
 
 - tmux and screen are not installed (Windows / Git Bash). The driver detaches
   itself with `nohup`, which is what Runs A/B relied on.
@@ -266,7 +269,8 @@ and harness are identical to `c3de40a`, which the jar was built from.
 `git status --porcelain` counts untracked files as dirty, so keep the root
 free of stray files until the run ends. `batch-runs/p3` does not exist yet.
 
-After launch: Ctrl-C or closing the window stops only the display. For a
+After launch: ~~Ctrl-C or closing the window stops only the display.~~
+**Wrong on Git Bash: a Ctrl-C in that window killed the run (§8).** For a
 one-off status, run `./batch/progress.sh p3`. The full log, with each chunk's
 `run-batch.sh` output and collect table, is in `batch-runs/p3/driver.log`.
 Per-chunk work is under `batch-runs/p3/c<i>/` (`work/<shard>/shard.log`,
@@ -275,8 +279,8 @@ Per-chunk work is under `batch-runs/p3/c<i>/` (`work/<shard>/shard.log`,
 
 | | |
 |---|---|
-| launch time | — (not launched) |
-| first `progress.sh p3` output | — |
+| launch time | 2026-10-09 17:18:22 (Leonard, Git Bash, `SHARDS=16 ./batch/phase2.sh p3`, driver pid 1617) |
+| first chunk-1 snapshot (26 min in) | 2,378 / 12,000 sims (19%), slowest-shard ETA 12:10:56 |
 
 ## 7. Files created on this machine
 
@@ -285,12 +289,114 @@ Per-chunk work is under `batch-runs/p3/c<i>/` (`work/<shard>/shard.log`,
 - `batch-runs/p3-smoke-failed-relative-out/`: the failed relative-path attempt
 - `PHASE3_REPORT.md`: this file, committed and pushed (report only, no code
   changes)
+- `batch-runs/p3/`: the full run (`c1`–`c5`, `merged/`, `provenance/`,
+  `driver.log`)
 
-## 8. Completion (separate session)
+## 8. Completion
 
-To fill in after `=== p3 complete: 60000 simulations across 5 chunks ===`:
-first chunk's `started` and last chunk's `finished` (from
-`provenance/c*-batch-info.txt`), redone chunks (`FAILED` / `INCOMPLETE` in
-`driver.log`), per-shard exit codes and elapsed times from each collect
-table, rows per N (10,000 each, 60,000 total), `p3-split.tgz` SHA-256, and
-the result of the auto-install into `SelSWIDM-analysis/data/phase3/`.
+`=== p3 complete: 60000 simulations across 5 chunks ===` at
+2026-10-13 11:06:16. The driver then installed into
+`SelSWIDM-analysis/data/phase3/split` (80 dirs, `.arm = p3`) and
+`data/phase3/provenance` (15 files): "nothing deleted".
+
+### Timeline
+
+| chunk | started | finished | wall |
+|---|---|---|---|
+| c1 | 2026-10-09 17:18:23 | 2026-10-10 06:23:08 | 13 h 05 |
+| c2 | 2026-10-10 06:23:09 | 2026-10-10 19:44:48 | 13 h 22 |
+| c3 | 2026-10-10 19:44:50 | 2026-10-11 08:37:17 | 12 h 52 |
+| c4 (4th attempt) | 2026-10-12 13:58:54 | 2026-10-13 00:52:26 | 10 h 54 |
+| c5 | 2026-10-13 00:52:27 | 2026-10-13 11:06:14 | 10 h 14 |
+
+The whole run took 3 d 17 h 48 min wall clock, about 60 h of it computing. The
+~29 h difference went on chunk 4's failed attempts and the restarts between
+them. Chunks 4 and 5 ran ~2 h faster than 1–3, after a fresh reboot and with
+the display refreshing hourly. That suggests the earlier chunks were already
+slowed by the leak below, though it was not measured. The smoke-test projection was
+11–14 h per chunk.
+
+### Chunk 4: four attempts
+
+| attempt | started | ended | what happened |
+|---|---|---|---|
+| 1 | 11 Oct 08:37:19 | 12 Oct 08:52:37 | Crawled to 14% in 24 h 15 min; the machine ran out of RAM and became unresponsive. At 08:52 all 16 shards exited 130, `chunk 4 FAILED`. Cause of the stall: the zombie-process leak (§9). What delivered the final interrupt was not pinned down, probably the console window during the unresponsive phase. |
+| 2 | 12 Oct 13:04:26 | ~13:09 | Killed by the hard restart (Kernel-Power 41, boot 13:09:43). No log line. |
+| 3 | 12 Oct 13:55:08 | 13:55:19 | Killed by a Ctrl-C in the `phase2.sh` window, which Claude Code had wrongly advised as safe: every shard rc=130, `chunk 4 FAILED`. |
+| 4 | 12 Oct 13:58:54 | 13 Oct 00:52:26 | OK, launched with `INTERVAL=3600` and the window left open. |
+
+Each resume deletes the incomplete chunk directory and its staged entries, so
+nothing from attempts 1–3 is in the data (80 staged dirs, 16 per chunk).
+Runs A and B both lost a chunk-4 attempt in the same way (Run A stalled
+~58 h, Run B ~18 h). Each ended with no log line, i.e. the driver was
+killed, most likely by a restart. Their data is unaffected for the same
+reason.
+
+### Collect tables (per-shard exit codes and elapsed seconds, from `driver.log`)
+
+All 80 shards of the five successful chunk runs exited 0. Elapsed seconds per N
+(min–max over that N's shards):
+
+| chunk | N=80 (1) | N=160 (1) | N=240 (1) | N=320 (2) | N=400 (4) | N=480 (7) |
+|---|---|---|---|---|---|---|
+| c1 | 1,863 | 11,138 | 35,344 | 44,263–45,228 | 44,190–47,075 | 43,231–47,080 |
+| c2 | 1,965 | 11,394 | 37,432 | 44,389–44,646 | 44,580–46,063 | 45,334–48,093 |
+| c3 | 2,072 | 11,656 | 36,788 | 44,043–44,061 | 43,835–45,073 | 44,546–46,341 |
+| c4 | 1,943 | 10,795 | 30,994 | 36,602–37,979 | 37,513–38,111 | 37,925–39,208 |
+| c5 | 1,723 | 9,602 | 29,829 | 35,484–35,557 | 34,978–35,772 | 35,350–36,821 |
+
+The failed chunk-4 attempts: 32 shard results with rc=130 (attempts 1 and 3);
+attempt 2 left none.
+
+### Data checks (all 60,000 rows of `merged/*/simulation-summary.csv`)
+
+| check | result |
+|---|---|
+| rows per N | 10,000 each for N = 80, 160, 240, 320, 400, 480; total 60,000 |
+| staged dirs | 80 (`c1`–`c5` × 16) |
+| `nb.ep.structure` | `both` in every row and every shard config |
+| `nb.gamma` | all in [0.1, 0.2]; observed 0.1000–0.2000 |
+| `net.static.pct.rec`, `net.dynamic.pct.rec` | numeric in every row; means 84.8 % static vs 31.5 % dynamic |
+| `nb.phi` (config) | 16/(N−1) to six decimals in all 80 shard configs |
+| exclusion (`net.pathlength.pre.epidemic.av` ≥ 100) | 12,635 rows (21.1 %; published design: 20.9 %) |
+| provenance | `c1`–`c5` `batch-info.txt`: commit `8d23c5c`, `git dirty : 0`, `ep structure : both`, `omega : random`, `gamma range : 0.1..0.2`, 16 shards, 2g |
+
+### Install and hand-over
+
+- Auto-install on USELAB02: `data/phase3/split` (identical to `merged/`,
+  checked with `diff -r`) and `data/phase3/provenance`. `data/split`
+  (still Run B, `.arm = runB`), `data/*.csv` and `_targets` keep their
+  7 Sep 2026 timestamps.
+- Copied to the analysis machine by hand as a zip of `merged/` and
+  `provenance/` (1.3 GB uncompressed), unpacked into `data/phase3/` with
+  `merged` renamed to `split`. No tarball or SHA-256 was made; check the copy
+  by recounting (80 dirs, 60,000 data rows).
+
+## 9. Harness changes made after the run (merged 2026-10-14)
+
+Harness and documentation only; no simulation code or flags change. The
+commits come after `8d23c5c`, so they are not in any chunk's provenance.
+
+- **Zombie-process leak** (`71d964c`). On USELAB02 every exited process stays
+  pinned in kernel memory until reboot (~55 KB each; no user-mode process
+  holds the handles, so presumably security software). The old `progress.sh`
+  forked ~380 processes per call, and the display called it every 60 s: about
+  30 GB a day. Measured: 200 calls → +75,000 process objects, −4.3 GB
+  available. That stalled chunk 4 of Run A, Run B and p3. Now `progress.sh`
+  forks ~4 processes per call (output identical), the display refreshes every
+  300 s, and `run-chunked.sh` refuses to start a chunk with less than
+  `SHARDS × (heap + 512 MB) + 4 GB` free (45,056 MB at 16 × 2g; tested).
+- **Relative `--out`** (`71d964c`). `run-batch.sh` now makes it absolute;
+  §4a's smoke-test failure is fixed.
+- **Ctrl-C** (`23579ef`, `bf40255`, `e3cfc37`). The README and the script's
+  messages no longer claim Ctrl-C is safe. `start.sh` now launches the driver
+  as a separate hidden Windows process (`setsid` elsewhere). That is **not
+  yet verified against a real Ctrl-C**: a SIGINT to the process group did not
+  reproduce the failure, and a console Ctrl-C cannot be raised from inside a
+  Claude Code session. `batch/README.md` → "Ctrl-C in the launch window" has
+  a 5-minute manual test; until it passes, leave the launch window open and
+  do not Ctrl-C it.
+- **Rename** (`e3cfc37`). `phase2.sh` → `start.sh` and `run-phase2.sh` →
+  `run-chunked.sh`; they drive every arm, Phase 3 included.
+- **Executable bit** (`ccf7a2c`). The scripts were stored as 100644, so they
+  would fail with "permission denied" on Linux/macOS. Now 100755.
