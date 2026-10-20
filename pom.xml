@@ -120,6 +120,47 @@
 							</filters>
 						</configuration>
 					</execution>
+					<!-- Standalone batch jar: same dependencies as the jar above, but its
+						main class is the Generator that batch/run-batch.sh runs, so a machine
+						with only a Java 8 runtime can run batches without Maven or the
+						locally installed gephi-toolkit. outputFile writes it directly, leaving
+						the jar above and the main artifact untouched; the copy of the
+						gephi-toolkit installer jar that src/main/resources carries is left
+						out, since it is never on the classpath (its classes are shaded in
+						from the dependency). -->
+					<execution>
+						<id>nidm-standalone</id>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<outputFile>${project.build.directory}/nidm-${project.version}-standalone.jar</outputFile>
+							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<transformers>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>nl.uu.socnetid.nidm.mains.Generator</mainClass>
+								</transformer>
+							</transformers>
+							<filters>
+								<filter>
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>META-INF/*.SF</exclude>
+										<exclude>META-INF/*.DSA</exclude>
+										<exclude>META-INF/*.RSA</exclude>
+									</excludes>
+								</filter>
+								<filter>
+									<artifact>${project.groupId}:${project.artifactId}</artifact>
+									<excludes>
+										<exclude>gephi-toolkit-*.jar</exclude>
+									</excludes>
+								</filter>
+							</filters>
+						</configuration>
+					</execution>
 				</executions>
 			</plugin>
 			<plugin>

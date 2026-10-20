@@ -95,13 +95,8 @@ describe the code that ran. I reran the same command with an absolute
 The failed attempt is kept as `batch-runs/p3-smoke-failed-relative-out/`
 (configs and `start.epoch` only; safe to delete).
 
-Suggested fix for a later, laptop-side harness commit (after Phase 3, so
-every chunk records the same commit), near the argument parsing in
-`run-batch.sh`:
-
-```sh
-case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
-```
+Fixed after the run in `71d964c` (see §9): `run-batch.sh` now makes a relative
+`--out` absolute.
 
 ### 4b. Checks (absolute `--out`), all passed
 

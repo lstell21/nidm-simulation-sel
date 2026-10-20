@@ -53,12 +53,17 @@
 #   --no-round-summary  set export.summary.each.round=false (breaks C1 figures)
 #   --heap SIZE       -Xmx per shard (default 1g)
 #   --out DIR         output root (default batch-runs/<timestamp>)
-#   --jar PATH        fat jar (default target/nidm-4.0.1.jar)
+#   --jar PATH        jar to run (default target/nidm-4.0.1.jar with
+#                     target/classes, i.e. a Maven build; without that build,
+#                     target/nidm-4.0.1-standalone.jar if present). A jar named
+#                     *-standalone.jar runs in standalone mode -- see below.
 #   --dry-run         print the plan, including shard allocation, and exit
 #
 # Platform: POSIX sh with GNU sed/awk/date (Linux, or Git Bash/MSYS on Windows;
 # macOS needs gsed for 'sed -i'). The classpath separator is chosen from
-# uname(1). Java 8 runtime; the jar is built once with Maven (see batch/README.md).
+# uname(1). Java 8 runtime; the jar is built once with Maven (see batch/README.md),
+# or, in standalone mode, taken prebuilt: then neither Maven nor the gephi-toolkit
+# install is needed, only Java 8 and this repository's src/main/resources.
 
 set -e
 
@@ -92,7 +97,7 @@ ROUND_SUMMARY=""; CENTRALITIES=""
 EP_STRUCTURE=""
 HEAP="1g"
 OUT=""
-JAR="$REPO/target/nidm-4.0.1.jar"
+JAR=""
 DRY=0
 
 # Exponent for the cost model used only to balance shards; a wrong value costs
@@ -139,13 +144,36 @@ case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 SRC_CONF="$REPO/src/main/resources/config.properties"
 
 [ -f "$SRC_CONF" ] || { echo "missing $SRC_CONF" >&2; exit 1; }
-[ -f "$JAR" ] || { echo "missing jar: $JAR -- run 'mvn package -DskipTests'" >&2; exit 1; }
 
 # target/classes must precede the jar on the classpath. PropertiesHandler
 # resolves the age-structure CSVs with Paths.get(resource.toURI()), which throws
 # FileSystemNotFoundException when the resource resolves to a jar:file: URI, so
 # the shaded jar cannot supply them -- they must be readable as real files.
 CLASSES="$REPO/target/classes"
+FAT_JAR="$REPO/target/nidm-4.0.1.jar"
+STANDALONE_JAR="$REPO/target/nidm-4.0.1-standalone.jar"
+
+# Without --jar: the Maven build (fat jar + target/classes) as always; only if
+# that build is absent, the standalone jar.
+if [ -z "$JAR" ]; then
+    if [ -f "$FAT_JAR" ] && [ -d "$CLASSES" ]; then JAR="$FAT_JAR"
+    elif [ -f "$STANDALONE_JAR" ]; then JAR="$STANDALONE_JAR"
+    else JAR="$FAT_JAR"
+    fi
+fi
+# Absolute for the same reason as --out: the shard subshell cd's first.
+case "$JAR" in /*) ;; *) JAR="$PWD/$JAR" ;; esac
+[ -f "$JAR" ] || { echo "missing jar: $JAR -- run 'mvn package -DskipTests', or put nidm-4.0.1-standalone.jar in target/" >&2; exit 1; }
+
+# Standalone mode: the jar carries every class and library, gephi-toolkit
+# included, so target/classes is neither needed nor used -- it would shadow the
+# jar's classes. The resource files the Java code opens as real files (see
+# above) are read from src/main/resources instead; the shard's conf directory
+# still comes first, so its config.properties wins.
+case "$JAR" in
+    *-standalone.jar) STANDALONE=1; CLASSES="$REPO/src/main/resources" ;;
+    *)                STANDALONE="" ;;
+esac
 [ -d "$CLASSES" ] || { echo "missing $CLASSES -- run 'mvn package -DskipTests'" >&2; exit 1; }
 
 NLEVELS=$(printf '%s' "$NGRID" | tr ',' '\n' | grep -c .)
@@ -186,6 +214,7 @@ echo "  output          : $OUT"
 [ -n "$SIGMA_RANDOM" ]  && echo "  sigma           : random"
 [ -n "$ROUND_SUMMARY" ] && echo "  round summary   : $ROUND_SUMMARY"
 [ -n "$EP_STRUCTURE" ] && echo "  ep structure    : $EP_STRUCTURE"
+[ -n "$STANDALONE" ]   && echo "  jar             : $JAR (standalone; resources from src/main/resources)"
 echo
 echo "  shard allocation:"
 echo "$ALLOC" | while read -r N S; do
@@ -213,6 +242,15 @@ mkdir -p "$OUT/work" "$OUT/split"
     echo "encounters      : ${ENCOUNTERS:-flat phi $PHI}"
     echo "centralities    : ${CENTRALITIES:-config (true)}"
     echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
+    if [ -n "$STANDALONE" ]; then
+        # "git commit" above is this clone's; the classes that run are the jar's,
+        # so record the commit the jar was built from (its git.properties).
+        JAR_GIT=$(unzip -p "$JAR" git.properties 2>/dev/null | tr -d '\r')
+        JAR_COMMIT=$(printf '%s\n' "$JAR_GIT" | sed -n 's/^git\.commit\.id=//p')
+        JAR_DIRTY=$(printf '%s\n' "$JAR_GIT" | sed -n 's/^git\.dirty=//p')
+        echo "jar             : $JAR (standalone)"
+        echo "jar built from  : ${JAR_COMMIT:-unknown (needs unzip)}${JAR_DIRTY:+ (dirty: $JAR_DIRTY)}"
+    fi
     echo "command         : $0 $ARGS"
 } > "$OUT/batch-info.txt"
 cp "$SRC_CONF" "$OUT/config.properties.source"

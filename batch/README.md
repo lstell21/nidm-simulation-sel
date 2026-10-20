@@ -15,6 +15,10 @@ mvn install:install-file -Dfile=src/main/resources/gephi-toolkit-0.9.3.jar \
 mvn package -DskipTests
 ```
 
+This produces `target/nidm-4.0.1.jar` (used with `target/classes`, the default)
+and `target/nidm-4.0.1-standalone.jar` (everything in one jar, gephi-toolkit
+included; for machines without Maven — see "Running on another machine").
+
 ## Run
 
 `config.properties` now carries the Table 1 design as its default (sigma, gamma,
@@ -292,7 +296,40 @@ commit the jar was built from, and that hash is only meaningful if it is on
 uncommitted harness edits; it was fast-forwarded, the edits re-applied and
 pushed before Phase 3 was launched.)
 
-On the target (Linux or Windows/Git Bash; macOS needs GNU sed):
+On the target (Linux or Windows/Git Bash; macOS needs GNU sed) there are two
+ways to get a runnable jar.
+
+**Standalone jar (recommended): Java 8 only — no Maven, no Gephi install.**
+`target/nidm-4.0.1-standalone.jar` (~90 MB) is built by `mvn package` on any
+machine that has the full setup, and carries every class and library,
+gephi-toolkit included. Build it from the commit you clone, so the jar and the
+clone's scripts and config match:
+
+```sh
+git clone -b selective-contact-reduction https://github.com/lstell21/nidm-simulation-sel
+cd nidm-simulation-sel
+java -version    # must report 1.8.x: the sources target Java 8 and the Gephi toolkit jar is Java-8 only
+mkdir -p target && cp <path>/nidm-4.0.1-standalone.jar target/
+./batch/run-batch.sh --dry-run --reps 10000 --shards 16 \
+    --gamma-min 0.1 --gamma-max 0.2 --omega-random --ep-structure both --no-centralities
+#   the plan shows "jar : …/nidm-4.0.1-standalone.jar (standalone; …)"
+```
+
+With no Maven build present (`target/nidm-4.0.1.jar` + `target/classes`),
+`run-batch.sh` picks the standalone jar from `target/` by itself; elsewhere,
+pass it with `--jar <path>/nidm-4.0.1-standalone.jar` (any jar named
+`*-standalone.jar` runs this way). The chunked driver (`start.sh`) calls
+`run-batch.sh`, so it follows the same choice. The jar still needs the clone:
+`run-batch.sh` and `config.properties` live there, and the age-structure and
+profession CSVs are read from `src/main/resources` — the Java code opens them
+with `Paths.get(resource.toURI())`, which fails for a file inside a jar, so a
+bare `java -jar nidm-4.0.1-standalone.jar` stops with
+`FileSystemNotFoundException` before the first simulation. In standalone mode
+`batch-info.txt` gains `jar` and `jar built from` lines (the commit and dirty
+flag from the jar's own `git.properties`, read with `unzip`; "unknown" without
+it), because `git commit` there names the clone, not the code that ran.
+
+**Maven build (as for Runs A, B and Phase 3).**
 
 ```sh
 git clone -b selective-contact-reduction https://github.com/lstell21/nidm-simulation-sel
@@ -308,9 +345,10 @@ ls target/nidm-4.0.1.jar target/classes
     --gamma-min 0.1 --gamma-max 0.2 --omega-random --ep-structure both --no-centralities
 ```
 
-`run-batch.sh` picks the classpath separator from `uname`, records the
-platform in `batch-info.txt`, and copies the source `config.properties` next
-to it. Launch the full run with `./batch/start.sh p3` (set `SHARDS=<physical
+Either way, `run-batch.sh` picks the classpath separator from `uname`, records
+the platform in `batch-info.txt`, and copies the source `config.properties`
+next to it. `--out` and `--jar` may be relative; both are made absolute before
+the shards start. Launch the full run with `./batch/start.sh p3` (set `SHARDS=<physical
 cores>` in the environment if that is not 16; it must be ≥ 6). The driver
 is started detached from the window, but on Git Bash that is not yet verified
 against a real Ctrl-C: until it is, leave the window open and do not Ctrl-C it
