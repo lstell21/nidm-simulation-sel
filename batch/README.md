@@ -19,6 +19,20 @@ This produces `target/nidm-4.0.1.jar` (used with `target/classes`, the default)
 and `target/nidm-4.0.1-batch.jar` (~7 MB, only what batch runs load; for
 machines without Maven — see "Running on another machine").
 
+**Prebuilt batch jar.** Instead of building it, download it from the
+pre-release [v4.0.1-selcor-pre1](https://github.com/lstell21/nidm-simulation-sel/releases/tag/v4.0.1-selcor-pre1)
+(built from `10fb4c6`; batch runs only; licences in `THIRD_PARTY_LICENSES.md`):
+
+```sh
+mkdir -p target && curl -L -o target/nidm-4.0.1-batch.jar \
+  https://github.com/lstell21/nidm-simulation-sel/releases/download/v4.0.1-selcor-pre1/nidm-4.0.1-batch.jar
+sha256sum target/nidm-4.0.1-batch.jar
+# 20449d4cdb7e0c68b2bb840d8c1952e44902aaa357d0be28ee015b490849ead6
+```
+
+Use it with a clone of the same tag (`git clone -b v4.0.1-selcor-pre1 …`), so
+the scripts, `config.properties` and data files match the jar.
+
 ## Run
 
 `config.properties` now carries the Table 1 design as its default (sigma, gamma,
@@ -315,7 +329,7 @@ and config match:
 git clone -b selective-contact-reduction https://github.com/lstell21/nidm-simulation-sel
 cd nidm-simulation-sel
 java -version    # must report 1.8.x: the sources target Java 8
-mkdir -p target && cp <path>/nidm-4.0.1-batch.jar target/
+mkdir -p target && cp <path>/nidm-4.0.1-batch.jar target/   # or download it: see "Setup"
 ./batch/run-batch.sh --dry-run --reps 10000 --shards 16 \
     --gamma-min 0.1 --gamma-max 0.2 --omega-random --ep-structure both --no-centralities
 #   the plan shows "jar : …/nidm-4.0.1-batch.jar (batch jar; …)"
