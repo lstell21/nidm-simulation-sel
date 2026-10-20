@@ -139,18 +139,42 @@ From a Git Bash window:
 ```sh
 cd ~/java-workspace/nidm-simulation-sel
 git status --short          # must print nothing
-nohup bash -c '
-  R="$PWD/batch-runs"
-  ./batch/run-batch.sh --reps 5000 --shards 16 --heap 2g --ngrid 240 \
-      --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 1 \
-      --no-centralities --tie-events --out "$R/m1"
-  echo "=== M1 exit $? at $(date -Iseconds) ==="
-  ./batch/run-batch.sh --reps 5000 --shards 16 --heap 2g --ngrid 240 \
-      --gamma-min 0.1 --gamma-max 0.4 --omega 0 \
-      --no-centralities --tie-events --out "$R/m2"
-  echo "=== M2 exit $? at $(date -Iseconds) ==="
-' > batch-runs/mech.log 2>&1 &
+if mkdir batch-runs/mech.lock 2>/dev/null; then
+  nohup bash -c '
+    R="$PWD/batch-runs"
+    ./batch/run-batch.sh --reps 5000 --shards 16 --heap 2g --ngrid 240 \
+        --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 1 \
+        --no-centralities --tie-events --out "$R/m1"
+    echo "=== M1 exit $? at $(date -Iseconds) ==="
+    ./batch/run-batch.sh --reps 5000 --shards 16 --heap 2g --ngrid 240 \
+        --gamma-min 0.1 --gamma-max 0.4 --omega 0 \
+        --no-centralities --tie-events --out "$R/m2"
+    echo "=== M2 exit $? at $(date -Iseconds) ==="
+  ' > batch-runs/mech.log 2>&1 &
+  echo "LAUNCHED: M1, then M2. Do not paste this again. Checking in 20 s ..."
+  sleep 20
+  echo "$(grep -c '^  launched' batch-runs/mech.log) of 16 M1 shards started. OK if 16. Leave this window open; check progress from a second window."
+else
+  echo "ALREADY LAUNCHED (batch-runs/mech.lock exists) -- nothing started."
+fi
 ```
+
+Expected output: `[1] <pid>` (bash's job notice; the number is a process
+ID, not an error), then `LAUNCHED: …`, and after 20 s `16 of 16 M1 shards
+started`. Pasting it a second time prints `ALREADY LAUNCHED` and starts
+nothing: `mkdir` of the lock directory is atomic and fails if it exists.
+Tested with `--dry-run` substituted, pasted twice in a row. To launch again
+after a failure, move `batch-runs/m1`, `m2` and `mech.log` aside and remove
+`batch-runs/mech.lock`.
+
+**First launch attempt, 20 Oct 17:01: discarded.** The earlier version of
+this command (no lock, no confirmation) was pasted twice, at 17:01:04 and
+17:01:35. Two `run-batch.sh` runs then wrote into the same `batch-runs/m1`,
+with two Java processes per shard directory, and the second overwrote
+`batch-info.txt`. Claude Code stopped both runs at ~17:04 (2 wrapper shells,
+66 `run-batch.sh` processes, 32 Java processes; M2 had not started) and moved
+`m1` and `mech.log` to
+`batch-runs/broken-20261020-1701-double-launch/`. Nothing from it is used.
 
 M1 runs first; M2 starts when M1 ends, whatever M1's exit code. Both write
 their plan, per-shard results and `done.` / `WARNING` into
