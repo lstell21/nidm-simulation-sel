@@ -120,29 +120,39 @@
 							</filters>
 						</configuration>
 					</execution>
-					<!-- Standalone batch jar: same dependencies as the jar above, but its
-						main class is the Generator that batch/run-batch.sh runs, so a machine
-						with only a Java 8 runtime can run batches without Maven or the
-						locally installed gephi-toolkit. outputFile writes it directly, leaving
-						the jar above and the main artifact untouched; the copy of the
-						gephi-toolkit installer jar that src/main/resources carries is left
-						out, since it is never on the classpath (its classes are shaded in
-						from the dependency). -->
+					<!-- Batch jar (target/nidm-<version>-batch.jar): only what a batch run
+						(batch/run-batch.sh -> Generator) loads, so a machine with a Java 8
+						runtime and a clone of this repository can run batches without Maven or
+						the gephi-toolkit install. Whitelist, whole libraries only, from a
+						-verbose:class trace of batch runs: our code, log4j, commons-math 2.1,
+						commons-math3, GraphStream gs-core and gs-algo, and from gephi-toolkit
+						only the one interface the bytecode verifier loads for NetworkStats
+						(Gephi itself runs only on the GEXF path-length route, which batch runs
+						never take). GUI and GEXF routes need the Maven build. Licence texts and
+						sources: THIRD_PARTY_LICENSES.md, copied into the jar with licenses/.
+						outputFile writes the jar directly, leaving the jar above and the main
+						artifact untouched. -->
 					<execution>
-						<id>nidm-standalone</id>
+						<id>nidm-batch</id>
 						<phase>package</phase>
 						<goals>
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<outputFile>${project.build.directory}/nidm-${project.version}-standalone.jar</outputFile>
+							<outputFile>${project.build.directory}/nidm-${project.version}-batch.jar</outputFile>
 							<createDependencyReducedPom>false</createDependencyReducedPom>
-							<transformers>
-								<transformer
-									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>nl.uu.socnetid.nidm.mains.Generator</mainClass>
-								</transformer>
-							</transformers>
+							<artifactSet>
+								<includes>
+									<include>${project.groupId}:${project.artifactId}</include>
+									<include>org.apache.logging.log4j:log4j-api</include>
+									<include>org.apache.logging.log4j:log4j-core</include>
+									<include>org.apache.commons:commons-math</include>
+									<include>org.apache.commons:commons-math3</include>
+									<include>org.graphstream:gs-core</include>
+									<include>org.graphstream:gs-algo</include>
+									<include>org.gephi:gephi-toolkit</include>
+								</includes>
+							</artifactSet>
 							<filters>
 								<filter>
 									<artifact>*:*</artifact>
@@ -152,13 +162,109 @@
 										<exclude>META-INF/*.RSA</exclude>
 									</excludes>
 								</filter>
+								<!-- our code plus the small config files; the data files are read
+									from src/main/resources (see run-batch.sh) -->
 								<filter>
 									<artifact>${project.groupId}:${project.artifactId}</artifact>
-									<excludes>
-										<exclude>gephi-toolkit-*.jar</exclude>
-									</excludes>
+									<includes>
+										<include>nl/**</include>
+										<include>git.properties</include>
+										<include>config.properties</include>
+										<include>log4j2.properties</include>
+									</includes>
+								</filter>
+								<filter>
+									<artifact>org.gephi:gephi-toolkit</artifact>
+									<includes>
+										<include>org/gephi/io/processor/spi/Processor.class</include>
+									</includes>
 								</filter>
 							</filters>
+							<transformers>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>nl.uu.socnetid.nidm.mains.Generator</mainClass>
+								</transformer>
+								<!-- the dependencies' META-INF/NOTICE* merged into one META-INF/NOTICE;
+									their META-INF/LICENSE* collide, so they are dropped here and
+									added back verbatim from licenses/third-party/ below -->
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+									<addHeader>false</addHeader>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/LICENSE</resource>
+									<file>${basedir}/LICENSE</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/THIRD_PARTY_LICENSES.md</resource>
+									<file>${basedir}/THIRD_PARTY_LICENSES.md</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/Apache-2.0.txt</resource>
+									<file>${basedir}/licenses/Apache-2.0.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/LGPL-3.0.txt</resource>
+									<file>${basedir}/licenses/LGPL-3.0.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/CeCILL-C-V1-en.txt</resource>
+									<file>${basedir}/licenses/CeCILL-C-V1-en.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/CDDL-1.0.txt</resource>
+									<file>${basedir}/licenses/CDDL-1.0.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/log4j-api-2.23.1-LICENSE.txt</resource>
+									<file>${basedir}/licenses/third-party/log4j-api-2.23.1-LICENSE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/log4j-api-2.23.1-NOTICE.txt</resource>
+									<file>${basedir}/licenses/third-party/log4j-api-2.23.1-NOTICE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/log4j-core-2.23.1-LICENSE.txt</resource>
+									<file>${basedir}/licenses/third-party/log4j-core-2.23.1-LICENSE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/log4j-core-2.23.1-NOTICE.txt</resource>
+									<file>${basedir}/licenses/third-party/log4j-core-2.23.1-NOTICE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/commons-math-2.1-LICENSE.txt</resource>
+									<file>${basedir}/licenses/third-party/commons-math-2.1-LICENSE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/commons-math-2.1-NOTICE.txt</resource>
+									<file>${basedir}/licenses/third-party/commons-math-2.1-NOTICE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/commons-math3-3.6.1-LICENSE.txt</resource>
+									<file>${basedir}/licenses/third-party/commons-math3-3.6.1-LICENSE.txt</file>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+									<resource>META-INF/licenses/third-party/commons-math3-3.6.1-NOTICE.txt</resource>
+									<file>${basedir}/licenses/third-party/commons-math3-3.6.1-NOTICE.txt</file>
+								</transformer>
+							</transformers>
 						</configuration>
 					</execution>
 				</executions>

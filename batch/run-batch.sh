@@ -55,14 +55,14 @@
 #   --out DIR         output root (default batch-runs/<timestamp>)
 #   --jar PATH        jar to run (default target/nidm-4.0.1.jar with
 #                     target/classes, i.e. a Maven build; without that build,
-#                     target/nidm-4.0.1-standalone.jar if present). A jar named
-#                     *-standalone.jar runs in standalone mode -- see below.
+#                     target/nidm-4.0.1-batch.jar if present). A jar named
+#                     *-batch.jar runs in batch-jar mode -- see below.
 #   --dry-run         print the plan, including shard allocation, and exit
 #
 # Platform: POSIX sh with GNU sed/awk/date (Linux, or Git Bash/MSYS on Windows;
 # macOS needs gsed for 'sed -i'). The classpath separator is chosen from
 # uname(1). Java 8 runtime; the jar is built once with Maven (see batch/README.md),
-# or, in standalone mode, taken prebuilt: then neither Maven nor the gephi-toolkit
+# or, in batch-jar mode, taken prebuilt: then neither Maven nor the gephi-toolkit
 # install is needed, only Java 8 and this repository's src/main/resources.
 
 set -e
@@ -151,28 +151,29 @@ SRC_CONF="$REPO/src/main/resources/config.properties"
 # the shaded jar cannot supply them -- they must be readable as real files.
 CLASSES="$REPO/target/classes"
 FAT_JAR="$REPO/target/nidm-4.0.1.jar"
-STANDALONE_JAR="$REPO/target/nidm-4.0.1-standalone.jar"
+BATCH_JAR="$REPO/target/nidm-4.0.1-batch.jar"
 
 # Without --jar: the Maven build (fat jar + target/classes) as always; only if
-# that build is absent, the standalone jar.
+# that build is absent, the batch jar.
 if [ -z "$JAR" ]; then
     if [ -f "$FAT_JAR" ] && [ -d "$CLASSES" ]; then JAR="$FAT_JAR"
-    elif [ -f "$STANDALONE_JAR" ]; then JAR="$STANDALONE_JAR"
+    elif [ -f "$BATCH_JAR" ]; then JAR="$BATCH_JAR"
     else JAR="$FAT_JAR"
     fi
 fi
 # Absolute for the same reason as --out: the shard subshell cd's first.
 case "$JAR" in /*) ;; *) JAR="$PWD/$JAR" ;; esac
-[ -f "$JAR" ] || { echo "missing jar: $JAR -- run 'mvn package -DskipTests', or put nidm-4.0.1-standalone.jar in target/" >&2; exit 1; }
+[ -f "$JAR" ] || { echo "missing jar: $JAR -- run 'mvn package -DskipTests', or put nidm-4.0.1-batch.jar in target/" >&2; exit 1; }
 
-# Standalone mode: the jar carries every class and library, gephi-toolkit
-# included, so target/classes is neither needed nor used -- it would shadow the
-# jar's classes. The resource files the Java code opens as real files (see
-# above) are read from src/main/resources instead; the shard's conf directory
-# still comes first, so its config.properties wins.
+# Batch-jar mode: the jar carries every class a batch run loads (our code,
+# log4j, commons-math, GraphStream; see THIRD_PARTY_LICENSES.md), so
+# target/classes is neither needed nor used -- it would shadow the jar's
+# classes. The resource files the Java code opens as real files (see above) are
+# read from src/main/resources instead; the shard's conf directory still comes
+# first, so its config.properties wins.
 case "$JAR" in
-    *-standalone.jar) STANDALONE=1; CLASSES="$REPO/src/main/resources" ;;
-    *)                STANDALONE="" ;;
+    *-batch.jar) BATCH_MODE=1; CLASSES="$REPO/src/main/resources" ;;
+    *)           BATCH_MODE="" ;;
 esac
 [ -d "$CLASSES" ] || { echo "missing $CLASSES -- run 'mvn package -DskipTests'" >&2; exit 1; }
 
@@ -214,7 +215,7 @@ echo "  output          : $OUT"
 [ -n "$SIGMA_RANDOM" ]  && echo "  sigma           : random"
 [ -n "$ROUND_SUMMARY" ] && echo "  round summary   : $ROUND_SUMMARY"
 [ -n "$EP_STRUCTURE" ] && echo "  ep structure    : $EP_STRUCTURE"
-[ -n "$STANDALONE" ]   && echo "  jar             : $JAR (standalone; resources from src/main/resources)"
+[ -n "$BATCH_MODE" ]   && echo "  jar             : $JAR (batch jar; resources from src/main/resources)"
 echo
 echo "  shard allocation:"
 echo "$ALLOC" | while read -r N S; do
@@ -242,13 +243,13 @@ mkdir -p "$OUT/work" "$OUT/split"
     echo "encounters      : ${ENCOUNTERS:-flat phi $PHI}"
     echo "centralities    : ${CENTRALITIES:-config (true)}"
     echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
-    if [ -n "$STANDALONE" ]; then
+    if [ -n "$BATCH_MODE" ]; then
         # "git commit" above is this clone's; the classes that run are the jar's,
         # so record the commit the jar was built from (its git.properties).
         JAR_GIT=$(unzip -p "$JAR" git.properties 2>/dev/null | tr -d '\r')
         JAR_COMMIT=$(printf '%s\n' "$JAR_GIT" | sed -n 's/^git\.commit\.id=//p')
         JAR_DIRTY=$(printf '%s\n' "$JAR_GIT" | sed -n 's/^git\.dirty=//p')
-        echo "jar             : $JAR (standalone)"
+        echo "jar             : $JAR (batch jar)"
         echo "jar built from  : ${JAR_COMMIT:-unknown (needs unzip)}${JAR_DIRTY:+ (dirty: $JAR_DIRTY)}"
     fi
     echo "command         : $0 $ARGS"

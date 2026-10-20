@@ -16,8 +16,8 @@ mvn package -DskipTests
 ```
 
 This produces `target/nidm-4.0.1.jar` (used with `target/classes`, the default)
-and `target/nidm-4.0.1-standalone.jar` (everything in one jar, gephi-toolkit
-included; for machines without Maven — see "Running on another machine").
+and `target/nidm-4.0.1-batch.jar` (~7 MB, only what batch runs load; for
+machines without Maven — see "Running on another machine").
 
 ## Run
 
@@ -299,35 +299,49 @@ pushed before Phase 3 was launched.)
 On the target (Linux or Windows/Git Bash; macOS needs GNU sed) there are two
 ways to get a runnable jar.
 
-**Standalone jar (recommended): Java 8 only — no Maven, no Gephi install.**
-`target/nidm-4.0.1-standalone.jar` (~90 MB) is built by `mvn package` on any
-machine that has the full setup, and carries every class and library,
-gephi-toolkit included. Build it from the commit you clone, so the jar and the
-clone's scripts and config match:
+**Batch jar (recommended for batch runs): Java 8 only — no Maven, no Gephi install.**
+`target/nidm-4.0.1-batch.jar` (~7 MB) is built by `mvn package` on any machine
+that has the full setup. It holds only what a batch run loads: this
+repository's code, log4j, commons-math 2.1 and 3.6.1, GraphStream gs-core and
+gs-algo 1.3, and one Gephi interface (licences and sources:
+`THIRD_PARTY_LICENSES.md`). It runs the batch modes the paper uses —
+`--ep-structure` dynamic and both, ω fixed or random, centralities on or off
+(checked below; `static` is the first half of `both`) — but **not** the GUI or the
+GEXF path-length route, which need Gephi and the other libraries of the Maven
+build. Build it from the commit you clone, so the jar and the clone's scripts
+and config match:
 
 ```sh
 git clone -b selective-contact-reduction https://github.com/lstell21/nidm-simulation-sel
 cd nidm-simulation-sel
-java -version    # must report 1.8.x: the sources target Java 8 and the Gephi toolkit jar is Java-8 only
-mkdir -p target && cp <path>/nidm-4.0.1-standalone.jar target/
+java -version    # must report 1.8.x: the sources target Java 8
+mkdir -p target && cp <path>/nidm-4.0.1-batch.jar target/
 ./batch/run-batch.sh --dry-run --reps 10000 --shards 16 \
     --gamma-min 0.1 --gamma-max 0.2 --omega-random --ep-structure both --no-centralities
-#   the plan shows "jar : …/nidm-4.0.1-standalone.jar (standalone; …)"
+#   the plan shows "jar : …/nidm-4.0.1-batch.jar (batch jar; …)"
 ```
 
 With no Maven build present (`target/nidm-4.0.1.jar` + `target/classes`),
-`run-batch.sh` picks the standalone jar from `target/` by itself; elsewhere,
-pass it with `--jar <path>/nidm-4.0.1-standalone.jar` (any jar named
-`*-standalone.jar` runs this way). The chunked driver (`start.sh`) calls
-`run-batch.sh`, so it follows the same choice. The jar still needs the clone:
-`run-batch.sh` and `config.properties` live there, and the age-structure and
-profession CSVs are read from `src/main/resources` — the Java code opens them
-with `Paths.get(resource.toURI())`, which fails for a file inside a jar, so a
-bare `java -jar nidm-4.0.1-standalone.jar` stops with
-`FileSystemNotFoundException` before the first simulation. In standalone mode
-`batch-info.txt` gains `jar` and `jar built from` lines (the commit and dirty
-flag from the jar's own `git.properties`, read with `unzip`; "unknown" without
-it), because `git commit` there names the clone, not the code that ran.
+`run-batch.sh` picks the batch jar from `target/` by itself; elsewhere, pass it
+with `--jar <path>/nidm-4.0.1-batch.jar` (any jar named `*-batch.jar` runs this
+way). The chunked driver (`start.sh`) calls `run-batch.sh`, so it follows the
+same choice. The jar still needs the clone: `run-batch.sh` and
+`config.properties` live there, and the age-structure and profession CSVs are
+read from `src/main/resources` — the Java code opens them with
+`Paths.get(resource.toURI())`, which fails for a file inside a jar, so a bare
+`java -jar nidm-4.0.1-batch.jar` stops with `FileSystemNotFoundException`
+before the first simulation. In batch-jar mode `batch-info.txt` gains `jar` and
+`jar built from` lines (the commit and dirty flag from the jar's own
+`git.properties`, read with `unzip`; "unknown" without it), because
+`git commit` there names the clone, not the code that ran.
+
+Checked on 20 Oct 2026 against the Maven build at N = 80:
+- every batch mode (`--ep-structure` dynamic and both × ω 0 and random ×
+  centralities off and on) ran without errors and wrote the same CSV columns;
+- 200 runs per build (`--ep-structure both`, ω random) gave final-size
+  distributions that a Kolmogorov–Smirnov test does not distinguish, for
+  dynamic and static final size and for selective and random reduction alike
+  (p = .47–.95).
 
 **Maven build (as for Runs A, B and Phase 3).**
 
