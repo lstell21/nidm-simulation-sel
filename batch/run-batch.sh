@@ -51,6 +51,12 @@
 #   --no-centralities  gate the unread centrality fields out of the round
 #                     summary; worth 1.6-1.9x. Use it.
 #   --no-round-summary  set export.summary.each.round=false (breaks C1 figures)
+#   --tie-events      set export.tie.events=true: each shard also writes
+#                     tie-events.csv and transmissions.csv (ties formed or
+#                     dissolved while an infection is active; one row per
+#                     infection, infector attributed at random among the
+#                     infected neighbours with a separate random stream; see
+#                     TieEventLog.java). Off by default.
 #   --heap SIZE       -Xmx per shard (default 1g)
 #   --out DIR         output root (default batch-runs/<timestamp>)
 #   --jar PATH        jar to run (default target/nidm-4.0.1.jar with
@@ -93,7 +99,7 @@ ZETA=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
 # than opt-in; --phi V is the escape hatch for a deliberately flat proportion.
 ENCOUNTERS=16; PHI=""
 GAMMA_MIN=""; GAMMA_MAX=""; ALPHA_MIN=""; ALPHA_MAX=""; SIGMA_MIN=""; SIGMA_MAX=""
-ROUND_SUMMARY=""; CENTRALITIES=""
+ROUND_SUMMARY=""; CENTRALITIES=""; TIE_EVENTS=""
 EP_STRUCTURE=""
 HEAP="1g"
 OUT=""
@@ -127,6 +133,7 @@ while [ $# -gt 0 ]; do
         --cost-exp)         COST_EXP="$2"; shift 2 ;;
         --no-round-summary) ROUND_SUMMARY=false; shift ;;
         --no-centralities)  CENTRALITIES=false; shift ;;
+        --tie-events)       TIE_EVENTS=true; shift ;;
         --ep-structure)     EP_STRUCTURE="$2"; shift 2 ;;
         --heap)             HEAP="$2"; shift 2 ;;
         --out)              OUT="$2"; shift 2 ;;
@@ -212,6 +219,7 @@ echo "  output          : $OUT"
 [ -n "$ENCOUNTERS" ]    && echo "  encounters      : $ENCOUNTERS per agent and step (nb.phi = $ENCOUNTERS/(N-1))"
 [ -n "$PHI" ]           && echo "  phi (flat)      : $PHI"
 [ -n "$CENTRALITIES" ]  && echo "  centralities    : $CENTRALITIES"
+[ -n "$TIE_EVENTS" ]    && echo "  tie events      : on (tie-events.csv, transmissions.csv)"
 [ -n "$SIGMA_RANDOM" ]  && echo "  sigma           : random"
 [ -n "$ROUND_SUMMARY" ] && echo "  round summary   : $ROUND_SUMMARY"
 [ -n "$EP_STRUCTURE" ] && echo "  ep structure    : $EP_STRUCTURE"
@@ -242,6 +250,7 @@ mkdir -p "$OUT/work" "$OUT/split"
     echo "alpha range     : ${ALPHA_MIN:-config}..${ALPHA_MAX:-config}"
     echo "encounters      : ${ENCOUNTERS:-flat phi $PHI}"
     echo "centralities    : ${CENTRALITIES:-config (true)}"
+    echo "tie events      : ${TIE_EVENTS:-config (false)}"
     echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
     if [ -n "$BATCH_MODE" ]; then
         # "git commit" above is this clone's; the classes that run are the jar's,
@@ -314,6 +323,14 @@ while read -r NAME N SHARD_REPS; do
     [ -n "$ALPHA_MAX" ] && sed -i "s|^nb\.alpha\.random\.max=.*|nb.alpha.random.max=$ALPHA_MAX|" "$C"
     [ -n "$ROUND_SUMMARY" ] && sed -i "s|^export\.summary\.each\.round=.*|export.summary.each.round=$ROUND_SUMMARY|" "$C"
     [ -n "$CENTRALITIES" ] && sed -i "s|^export\.summary\.each\.round\.centralities=.*|export.summary.each.round.centralities=$CENTRALITIES|" "$C"
+    if [ -n "$TIE_EVENTS" ]; then
+        # older configs lack the key; PropertiesHandler reads it as false when absent
+        if grep -q '^export\.tie\.events=' "$C"; then
+            sed -i "s|^export\.tie\.events=.*|export.tie.events=$TIE_EVENTS|" "$C"
+        else
+            echo "export.tie.events=$TIE_EVENTS" >> "$C"
+        fi
+    fi
     [ -n "$EP_STRUCTURE" ] && sed -i "s|^nb\.ep\.structure=.*|nb.ep.structure=$EP_STRUCTURE|" "$C"
 
     CONFW=$(cygpath -w "$SDIR/conf" 2>/dev/null | tr '\\' '/' || echo "$SDIR/conf")
