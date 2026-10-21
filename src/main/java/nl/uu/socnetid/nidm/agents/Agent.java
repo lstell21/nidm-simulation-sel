@@ -52,6 +52,7 @@ import nl.uu.socnetid.nidm.diseases.Disease;
 import nl.uu.socnetid.nidm.diseases.DiseaseFactory;
 import nl.uu.socnetid.nidm.diseases.DiseaseSpecs;
 import nl.uu.socnetid.nidm.diseases.types.DiseaseGroup;
+import nl.uu.socnetid.nidm.io.csv.TieEventLog;
 import nl.uu.socnetid.nidm.networks.AssortativityConditions;
 import nl.uu.socnetid.nidm.networks.Network;
 import nl.uu.socnetid.nidm.stats.AgentConnectionStats;
@@ -1198,6 +1199,11 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
             addConnection(agent);
             trackAcceptedRequestOut();
             agent.trackAcceptedRequestIn();
+            // tie-level output (export.tie.events); observes only, null when off
+            TieEventLog tieEventLog = this.getNetwork().getTieEventLog();
+            if (tieEventLog != null) {
+                tieEventLog.tieFormed(this, agent);
+            }
             return true;
         }
         trackDeclinedRequestOut();
@@ -1226,6 +1232,11 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         this.removeConnection(agent);
         this.trackBrokenTieActive();
         agent.notifyBrokenTie(this);
+        // tie-level output (export.tie.events); observes only, null when off
+        TieEventLog tieEventLog = this.getNetwork().getTieEventLog();
+        if (tieEventLog != null) {
+            tieEventLog.tieDissolved(this, agent);
+        }
     }
 
     /**
@@ -1789,6 +1800,12 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
             if (ThreadLocalRandom.current().nextDouble() <=
                     StatsComputer.computeProbabilityOfInfection(this, nI)) {
                 this.infect(this.getDiseaseSpecs(), simRound);
+                // tie-level output (export.tie.events): the model names no infector, so the
+                // log attributes one of the nI infected neighbours using its own random stream
+                TieEventLog tieEventLog = this.getNetwork().getTieEventLog();
+                if (tieEventLog != null) {
+                    tieEventLog.transmission(this, nI);
+                }
             }
         }
     }

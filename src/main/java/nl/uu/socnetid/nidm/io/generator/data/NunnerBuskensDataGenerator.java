@@ -52,6 +52,7 @@ import nl.uu.socnetid.nidm.diseases.types.DiseaseType;
 import nl.uu.socnetid.nidm.io.csv.NunnerBuskensAgentDetailsWriterReduced;
 import nl.uu.socnetid.nidm.io.csv.NunnerBuskensRoundSummaryWriter;
 import nl.uu.socnetid.nidm.io.csv.NunnerBuskensSimulationSummaryWriterReduced;
+import nl.uu.socnetid.nidm.io.csv.TieEventLog;
 import nl.uu.socnetid.nidm.io.network.GEXFWriter;
 import nl.uu.socnetid.nidm.networks.Network;
 import nl.uu.socnetid.nidm.simulation.Simulation;
@@ -89,6 +90,8 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
     private NunnerBuskensRoundSummaryWriter rsWriter;
     private NunnerBuskensAgentDetailsWriterReduced adWriter;
     private GEXFWriter gexfWriter;
+    // tie-level output (export.tie.events); null when off
+    private TieEventLog tieEventLog;
 
 
     /**
@@ -140,6 +143,10 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
         if (PropertiesHandler.getInstance().isExportAgentDetails() ||
                 PropertiesHandler.getInstance().isExportAgentDetailsReduced()) {
             this.adWriter = new NunnerBuskensAgentDetailsWriterReduced(getExportPath() + "agent-details.csv", this.dgData);
+        }
+        // tie events and transmissions during active epidemics
+        if (PropertiesHandler.getInstance().isExportTieEvents()) {
+            this.tieEventLog = new TieEventLog(getExportPath(), this.dgData);
         }
     }
 
@@ -421,6 +428,9 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
 
             // create network
             this.network = new Network();
+            if (this.tieEventLog != null) {
+                this.tieEventLog.attach(this.network);
+            }
 
             // begin: GEXF export
             if (PropertiesHandler.getInstance().isExportGexf()) {
@@ -484,6 +494,9 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             // write summary data
             if (PropertiesHandler.getInstance().isExportSummary()) {
                 this.ssWriter.writeCurrentData();
+            }
+            if (this.tieEventLog != null) {
+                this.tieEventLog.flush();
             }
             // write agent data
             if (PropertiesHandler.getInstance().isExportAgentDetails() ||
@@ -647,6 +660,9 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
                     PropertiesHandler.getInstance().isExportAgentDetailsReduced()) {
                 this.adWriter.flush();
                 this.adWriter.close();
+            }
+            if (this.tieEventLog != null) {
+                this.tieEventLog.close();
             }
         } catch (IOException e) {
             logger.error(e);

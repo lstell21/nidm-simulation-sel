@@ -52,6 +52,7 @@ import nl.uu.socnetid.nidm.data.in.Professions;
 import nl.uu.socnetid.nidm.diseases.DiseaseSpecs;
 import nl.uu.socnetid.nidm.simulation.Simulation;
 import nl.uu.socnetid.nidm.simulation.SimulationListener;
+import nl.uu.socnetid.nidm.io.csv.TieEventLog;
 import nl.uu.socnetid.nidm.stats.DijkstraShortestPath;
 import nl.uu.socnetid.nidm.stats.StatsComputer;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
@@ -83,6 +84,9 @@ public class Network extends SingleGraph implements SimulationListener {
 
     // listeners
     private Set<NetworkListener> networkListeners = new CopyOnWriteArraySet<NetworkListener>();
+
+    // tie-level output (export.tie.events); null when off, so the agents' hooks do nothing
+    private TieEventLog tieEventLog = null;
 
 
     /**
@@ -444,6 +448,25 @@ public class Network extends SingleGraph implements SimulationListener {
      */
     public Collection<Agent> getAgents() {
         return this.getNodeSet();
+    }
+
+    /**
+     * Gets the tie-level output log (export.tie.events).
+     *
+     * @return the log, or null if tie events are not exported
+     */
+    public TieEventLog getTieEventLog() {
+        return this.tieEventLog;
+    }
+
+    /**
+     * Sets the tie-level output log (export.tie.events); see TieEventLog.attach.
+     *
+     * @param tieEventLog
+     *          the log
+     */
+    public void setTieEventLog(TieEventLog tieEventLog) {
+        this.tieEventLog = tieEventLog;
     }
 
     /**

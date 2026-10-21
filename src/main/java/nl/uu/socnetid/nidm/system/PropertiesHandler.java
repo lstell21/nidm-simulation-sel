@@ -122,6 +122,7 @@ public class PropertiesHandler {
     private boolean exportAgentDetails;
     private boolean exportAgentDetailsReduced;
     private boolean exportGexf;
+    private boolean exportTieEvents;
     // data analysis?
     private boolean analyzeData;
 
@@ -546,6 +547,8 @@ public class PropertiesHandler {
         this.exportAgentDetails = Boolean.parseBoolean(configProps.getProperty("export.agent.details"));
         this.exportAgentDetailsReduced = Boolean.parseBoolean(configProps.getProperty("export.agent.details.reduced"));
         this.exportGexf = Boolean.parseBoolean(configProps.getProperty("export.gexf"));
+        // defaults to false when absent, so existing configs produce exactly the existing output
+        this.exportTieEvents = Boolean.parseBoolean(configProps.getProperty("export.tie.events", "false"));
 
         // analyze data?
         this.analyzeData = Boolean.parseBoolean(configProps.getProperty("analyze.data"));
@@ -721,6 +724,16 @@ public class PropertiesHandler {
      */
     public boolean isExportGexf() {
         return exportGexf;
+    }
+
+    /**
+     * Whether tie events and transmissions during active epidemics are exported
+     * (tie-events.csv, transmissions.csv; see TieEventLog).
+     *
+     * @return the exportTieEvents
+     */
+    public boolean isExportTieEvents() {
+        return exportTieEvents;
     }
 
     /**

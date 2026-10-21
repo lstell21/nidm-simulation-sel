@@ -302,6 +302,52 @@ Never into `data/split` — that is Run A. `read_and_merge_csvs()` merges the
 `provenance/` with the data: each chunk's `batch-info.txt` is the provenance
 record (commit, platform, command line, overrides, start/finish).
 
+## Tie-level output (`--tie-events`, mechanism run)
+
+`--tie-events` sets `export.tie.events=true` in every shard's config (the key
+defaults to `false`; `batch-info.txt` records `tie events : true`). Each shard
+then also writes, next to the two summaries:
+
+- **`tie-events.csv`**: one row per tie formed or dissolved while an infection
+  is active. These are exactly the changes counted by
+  `net.dynamic.ties.out.accepted.epidemic` (form) and
+  `net.dynamic.ties.broken.active.epidemic` (dissolve).
+  Columns: `sim.uid`, `sim.cnt`, `sim.round`, `event` (form | dissolve),
+  `initiator.id`, `partner.id`, both agents' `disease.state` (S/I/R) and
+  `r.sigma`, `nb.selective`, `common.neighbours` (before the change; adding
+  or removing the tie itself does not change it), `distance.after` (BFS
+  distance between the endpoints after a dissolution, uncapped, −1 if
+  disconnected; NA for form events), `tie.formed.round` (−1 if the tie existed
+  before the outbreak).
+- **`transmissions.csv`**: one row per infection through
+  `Agent.computeDiseaseTransmission`; the index case has no row.
+  Columns: `sim.uid`, `sim.cnt`, `sim.round`, `infectee.id`, `infector.id`,
+  both `r.sigma`, `tie.formed.round` of the infector–infectee tie (−1 if
+  pre-epidemic), `infectee.infected.neighbours` (the nI the infection
+  probability was computed with).
+
+`sim.round` is the cumulative round of `round-summary.csv`.
+
+**Infector attribution.** The model decides an infection with a single draw
+against P(infection | nI) and names no infector. The log therefore picks one of
+the nI infected neighbours uniformly at random. The draw comes from its own
+`java.util.Random`, never from the model's `ThreadLocalRandom` or
+`Collections.shuffle`. The log also never calls `Network.hasActiveInfection()`,
+which writes a network attribute. With the flag off no extra code runs. See
+`src/main/java/nl/uu/socnetid/nidm/io/csv/TieEventLog.java`.
+
+**Checked 20 Oct 2026, N = 80, 200 runs each with the flag on and off**
+(dynamic, ω random):
+- The flag does not change the model: final size by condition, KS p = .72 /
+  .94; both existing CSVs have identical columns.
+- The counts agree in all 200 runs: dissolve events, form events, and
+  transmissions + index case = ever infected.
+- Both files line up with `round-summary.csv` round by round.
+- At N = 80 a run writes ~420 tie events (33 KiB) and ~42 transmissions
+  (2.5 KiB), with no measurable change in s/sim.
+- In `--ep-structure both` batches, `transmissions.csv` also holds the
+  static arm's infections; they come earlier in `sim.round`.
+
 ## Running on another machine
 
 Clone from `origin`, never copy a working tree: `batch-info.txt` records the
