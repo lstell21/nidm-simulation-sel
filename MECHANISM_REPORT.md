@@ -1,12 +1,13 @@
 # Mechanism run (M1, M2): sim-machine hand-over report
 
-**STATUS: ready to launch.** Part B steps 1–4 of `MECHANISM_claude-code.md`
-are done. The build and smoke tests pass, and check 2 of the brief holds in
-all 72 smoke runs. The launch command is in §5; Leonard runs it. Step 5
-(verify, package `m1.tgz` / `m2.tgz`, completion section) is a separate
-session.
+**STATUS: done.** M1 and M2 completed on 20 Oct 2026: 5,000 runs each, all
+32 shards exit 0, both at commit `a0777de` on `mechanism-output` with a clean
+tree. Check 2 holds in all 10,000 runs. Check 3 passes: every final-size
+distribution matches Run A/B (KS p ≥ .074). The M1 random condition is
+borderline on mean final size (z = 2.26), see §6. `m1.tgz` and `m2.tgz` and
+their `.sha256` files are in `batch-runs/mech-handover/` for the laptop.
 
-Written 2026-10-20 by Claude Code on USELAB02.
+Written 2026-10-20 (§1–5) and 2026-10-21 (§6) by Claude Code on USELAB02.
 
 ## 1. Machine and repository
 
@@ -205,10 +206,101 @@ though they equal the config defaults (α ~ U[0, 1]; M2's γ 0.1–0.4), so
   does not clear an existing `--out`. There is no resume, but at ~2 h a batch
   a restart costs little.
 
-## 6. Completion (separate session, Part B step 5)
+## 6. Completion (Part B step 5, 21 Oct 2026)
 
-To do: verify 5,000 runs per batch, the merged `split/` outputs and
-`batch-info.txt` (clean tree, commit on `mechanism-output`), and check 3 if
-the Run A/B summaries are available here. Package `m1.tgz` / `m2.tgz`
-(merged outputs plus `batch-info.txt`) with `.sha256` files, and add sizes and
-SHA-256 here.
+Launched once with the guarded command of §5 (20 Oct 17:06; `mech.log`
+shows one plan per batch, and `mech.lock` exists).
+
+### Runs and provenance
+
+| | M1 | M2 |
+|---|---|---|
+| `started` → `finished` | 2026-10-20 17:06:25 → 18:35:02 (1 h 29) | 18:35:02 → 20:01:29 (1 h 26) |
+| shards | 16, all rc = 0; 4,925–5,314 s | 16, all rc = 0; 5,062–5,182 s |
+| runs (`simulation-summary.csv` rows) | 5,000 | 5,000 |
+| `batch-info.txt` | commit `a0777de`, branch `mechanism-output`, `git dirty : 0`, `omega : random`, `gamma range : 0.1..0.2`, `alpha range : 0..1`, `tie events : true`, `centralities : false` | commit `a0777de`, `git dirty : 0`, `omega : 0`, `gamma range : 0.1..0.4`, `tie events : true`, `centralities : false` |
+| `split/` (merged, 16 shard dirs) | 590 MB | 624 MB |
+| whole run directory | 1.2 GB | 1.3 GB |
+| tie events / transmissions per run | 1,264 / 74 | 1,329 / 123 |
+
+`a0777de` is this report's guarded-launch commit; it changes no code (the
+jar is from `27074ea`, §1). Wall time came in at the low end of the §4
+estimate.
+
+### Check 2 (per run), on all 10,000 runs
+
+Dissolve events = `net.dynamic.ties.broken.active.epidemic`, form events =
+`net.dynamic.ties.out.accepted.epidemic`, and transmissions + 1 = ever
+infected (`net.dynamic.pct.rec` × N / 100). **All 5,000 M1 runs and all 5,000
+M2 runs match exactly**, and every tie-event and transmission row belongs to a
+run in the summary.
+
+### Check 3: outcomes vs Run A / Run B at N = 240
+
+- **M2** has Run B's design (ω = 0, γ ~ U[0.1, 0.4]).
+- **M1** (ω random, γ ~ U[0.1, 0.2]) is compared with Run A restricted to
+  γ ≤ 0.2. That restriction is again uniform on [0.1, 0.2], with α and ω
+  both U[0, 1].
+- Run A and Run B at N = 240 each have 5 shard dirs, 10,000 runs.
+- Final size = `net.dynamic.pct.rec`; take-off = final size > 10 %.
+- Means and proportions are given ± 1.96 SE; z is the difference over its SE.
+- KS = two-sample Kolmogorov–Smirnov test on final size, with the asymptotic
+  p-value (conservative with the ties of a discrete final size).
+
+Unfiltered:
+
+| batch vs reference | condition | n | mean size | ref n | ref mean | z | take-off % | ref take-off % | z | KS p |
+|---|---|---|---|---|---|---|---|---|---|---|
+| M1 vs Run A (γ ≤ 0.2) | selective | 2,504 | 29.34 ± 1.35 | 1,600 | 29.78 ± 1.71 | −0.40 | 49.4 ± 2.0 | 48.5 ± 2.4 | 0.59 | .271 |
+| M1 vs Run A (γ ≤ 0.2) | random | 2,496 | 33.14 ± 1.45 | 1,648 | 30.55 ± 1.72 | **2.26** | 51.2 ± 2.0 | 49.0 ± 2.4 | 1.39 | .074 |
+| M2 vs Run B | selective | 2,492 | 52.68 ± 1.63 | 5,070 | 52.39 ± 1.14 | 0.29 | 68.7 ± 1.8 | 68.1 ± 1.3 | 0.50 | .827 |
+| M2 vs Run B | random | 2,508 | 50.69 ± 1.68 | 4,930 | 51.07 ± 1.20 | −0.36 | 64.2 ± 1.9 | 64.6 ± 1.3 | −0.35 | .864 |
+
+After the analysis exclusion (`net.pathlength.pre.epidemic.av` < 100):
+
+| batch vs reference | condition | n | mean size | ref mean | z | take-off % | ref take-off % | z |
+|---|---|---|---|---|---|---|---|---|
+| M1 vs Run A (γ ≤ 0.2) | selective | 1,988 | 34.07 ± 1.58 | 34.90 ± 2.00 | −0.64 | 55.8 ± 2.2 | 55.7 ± 2.7 | 0.05 |
+| M1 vs Run A (γ ≤ 0.2) | random | 1,973 | 38.58 ± 1.69 | 35.74 ± 2.05 | **2.09** | 58.1 ± 2.2 | 55.7 ± 2.7 | 1.35 |
+| M2 vs Run B | selective | 2,180 | 57.59 ± 1.73 | 57.81 ± 1.21 | −0.20 | 73.5 ± 1.9 | 73.4 ± 1.3 | 0.10 |
+| M2 vs Run B | random | 2,160 | 56.51 ± 1.79 | 56.40 ± 1.27 | 0.10 | 69.6 ± 1.9 | 70.0 ± 1.4 | −0.34 |
+
+**Verdict: passes, with one borderline cell.** M2 reproduces Run B closely
+(all |z| ≤ 0.5, KS p ≥ .83), and M1's selective condition matches Run A. In
+M1's random condition the mean final size is 2.6 points above Run A
+(z = 2.26 unfiltered, 2.09 filtered). Take-off there is within error
+(z = 1.39), and the full distribution is not distinguishable (KS p = .074).
+Of 16 overlapping comparisons this is the only one with |z| > 1.96, roughly
+what chance produces (Bonferroni over the 8 distinct comparisons: 2.73).
+The flag is shown not to change the model: check 1 on the laptop, and
+check 2 holds here run by run. Recorded as is, per the brief: definitions
+and samples are not adjusted. The H2 analysis uses M1 across α by condition,
+so it is worth keeping in mind there.
+
+### Hand-over files (`batch-runs/mech-handover/`)
+
+Each tarball holds `split/` (16 shard dirs, each with `config.properties`
+and `data/nunnerbuskens/{simulation-summary,round-summary,tie-events,transmissions}.csv`)
+and `batch-info.txt`. Verified with `sha256sum -c` and by listing the
+contents: 16 of each CSV plus `batch-info.txt`.
+
+| file | size | SHA-256 |
+|---|---|---|
+| `m1.tgz` | 99,528,747 B | `8f9bd2fd67739021d9a8e9b66965b3bf37854bdcd783f9ae27ed14865564dedf` |
+| `m2.tgz` | 109,793,801 B | `47d9557d009f0c6155ed2a2cf1ff664684a1ddebd6c38763026af0faf52f05b9` |
+
+The `.sha256` files are in `sha256sum` format (`<hash> *<file>`; the `*` is
+Git Bash's binary-mode marker, which `sha256sum -c` and `shasum -a 256 -c`
+accept).
+
+On the laptop, in `SelSWIDM-analysis`:
+
+```sh
+sha256sum -c m1.tgz.sha256 m2.tgz.sha256          # macOS: shasum -a 256 -c …
+mkdir -p data/mechanism/m1 data/mechanism/m2
+tar xzf m1.tgz -C data/mechanism/m1               # -> data/mechanism/m1/split/n240-s*/…, batch-info.txt
+tar xzf m2.tgz -C data/mechanism/m2
+```
+
+Nothing in `SelSWIDM-analysis` on USELAB02 was touched (`data/split`,
+`data/runB`, `data/phase3` are unchanged).
