@@ -27,6 +27,8 @@ package nl.uu.socnetid.nidm.gui;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.text.NumberFormat;
 import java.util.Iterator;
 import java.util.Set;
@@ -38,6 +40,8 @@ import javax.swing.JSlider;
 import javax.swing.SwingConstants;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+
+import nl.uu.socnetid.nidm.utility.NunnerBuskens;
 
 /**
  * @author Hendrik Nunner
@@ -56,6 +60,7 @@ public class NunnerBuskensPanel extends SharedUtilityPanel implements ChangeList
     private DoubleJFormattedTextField txtSliderB2;
     private JSlider sliderAlpha;
     private DoubleJFormattedTextField txtSliderAlpha;
+    private DoubleJFormattedTextField txtD;
 
     // listeners
     private final Set<NunnerBuskensChangeListener> changeListeners = new CopyOnWriteArraySet<NunnerBuskensChangeListener>();
@@ -226,6 +231,32 @@ public class NunnerBuskensPanel extends SharedUtilityPanel implements ChangeList
         separator_1.setBounds(0, 173, 312, 10);
         add(separator_1);
 
+        // weight of the perceived local risk of infection against the perceived global risk (d),
+        // passed to NunnerBuskens(b1, b2, alpha, c1, c2, d, panel); changes reach a running model
+        JLabel lblD1 = new JLabel("Local vs. global risk weight");
+        lblD1.setToolTipText("d: weight of the perceived local risk of infection; 1 - d weights the "
+                + "perceived global risk (prevalence)");
+        lblD1.setBounds(42, 299, 165, 16);
+        add(lblD1);
+
+        JLabel lblD2 = new JLabel("(d):");
+        lblD2.setHorizontalAlignment(SwingConstants.RIGHT);
+        lblD2.setBounds(206, 299, 35, 16);
+        add(lblD2);
+
+        txtD = new DoubleJFormattedTextField(NumberFormat.getNumberInstance());
+        txtD.setHorizontalAlignment(SwingConstants.RIGHT);
+        txtD.setBounds(251, 297, 50, 20);
+        txtD.setValue(new Double(0.5));
+        txtD.setInputVerifier(new DoubleInputVerifier(0.0, 1.0));
+        txtD.addPropertyChangeListener("value", new PropertyChangeListener() {
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                notifyDChanged();
+            }
+        });
+        add(txtD);
+
     }
 
     /**
@@ -271,6 +302,35 @@ public class NunnerBuskensPanel extends SharedUtilityPanel implements ChangeList
      */
     public double getAlpha() {
         return this.txtSliderAlpha.getDouble();
+    }
+
+    /**
+     * Gets the weight of the perceived local risk of infection (d).
+     *
+     * @return the weight of the perceived local risk of infection (d)
+     */
+    public double getD() {
+        return this.txtD.getDouble();
+    }
+
+    /**
+     * Sets the weight of the perceived local risk of infection (d); a running model follows.
+     *
+     * @param d
+     *          the weight of the perceived local risk of infection, 0-1
+     */
+    public void setD(double d) {
+        this.txtD.setValue(new Double(d));
+    }
+
+    /**
+     * Creates the NunnerBuskens utility function for the values in this panel. It follows later
+     * changes in this panel (b1, b2, alpha, c1, c2, d).
+     *
+     * @return the utility function
+     */
+    public NunnerBuskens createUtilityFunction() {
+        return new NunnerBuskens(getB1(), getB2(), getAlpha(), getC1(), getC2(), getD(), this);
     }
 
     /* (non-Javadoc)
@@ -400,6 +460,16 @@ public class NunnerBuskensPanel extends SharedUtilityPanel implements ChangeList
         Iterator<NunnerBuskensChangeListener> listenersIt = this.changeListeners.iterator();
         while (listenersIt.hasNext()) {
             listenersIt.next().notifyAlphaChanged();
+        }
+    }
+
+    /**
+     * Notifies listeners of changed d.
+     */
+    private final void notifyDChanged() {
+        Iterator<NunnerBuskensChangeListener> listenersIt = this.changeListeners.iterator();
+        while (listenersIt.hasNext()) {
+            listenersIt.next().notifyDChanged();
         }
     }
 

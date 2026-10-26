@@ -374,6 +374,21 @@ public class NunnerBuskens extends UtilityFunction implements NunnerBuskensChang
         this.alpha = this.nbPanel.getAlpha();
     }
 
+    /* (non-Javadoc)
+     * @see nl.uu.socnetid.nidm.gui.NunnerBuskensChangeListener#notifyDChanged()
+     */
+    @Override
+    public void notifyDChanged() {
+        this.d = this.nbPanel.getD();
+    }
+
+    /**
+     * @return the weight of the perceived local risk of infection (d)
+     */
+    public double getD() {
+        return d;
+    }
+
 
     /**
      * @return the b1

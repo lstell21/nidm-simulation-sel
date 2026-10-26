@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadLocalRandom;
 
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
@@ -91,7 +90,6 @@ import nl.uu.socnetid.nidm.utility.BurgerBuskens;
 import nl.uu.socnetid.nidm.utility.CarayolRoux;
 import nl.uu.socnetid.nidm.utility.Cidm;
 import nl.uu.socnetid.nidm.utility.Cumulative;
-import nl.uu.socnetid.nidm.utility.NunnerBuskens;
 import nl.uu.socnetid.nidm.utility.NunnerBuskens2;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
@@ -224,16 +222,16 @@ public class UserInterface implements NodeClickListener, SimulationListener, Age
         // initialize controls frame
         controlsFrame.getContentPane().setLayout(null);
         controlsFrame.setTitle("NIDM Simulator");
-        controlsFrame.setBounds(10, 10, 1060, 740);
+        controlsFrame.setBounds(10, 10, 1060, 840);
         switch (PropertiesHandler.getInstance().getOsType()) {
             case WIN:
-                controlsFrame.setBounds(10, 10, 1075, 755);
+                controlsFrame.setBounds(10, 10, 1075, 855);
                 break;
             case MAC:
             case OTHER:
             case UNIX:
             default:
-                controlsFrame.setBounds(10, 10, 1060, 740);
+                controlsFrame.setBounds(10, 10, 1060, 840);
                 break;
         }
         controlsFrame.setResizable(false);
@@ -242,7 +240,7 @@ public class UserInterface implements NodeClickListener, SimulationListener, Age
         //////////// TABBED PANE (MODEL, SIMULATION, EXPORT) ////////////
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.TOP, JTabbedPane.WRAP_TAB_LAYOUT);
         tabbedPane.setBorder(null);
-        tabbedPane.setBounds(6, 6, 340, 715);
+        tabbedPane.setBounds(6, 6, 340, 815);
         controlsFrame.getContentPane().add(tabbedPane);
 
         //////////// MODEL ////////////
@@ -251,22 +249,22 @@ public class UserInterface implements NodeClickListener, SimulationListener, Age
         tabbedPane.add("Model", modelPane);
         modelPane.setLayout(null);
 
-        cidmPanel.setBounds(3, 51, 312, 615);
+        cidmPanel.setBounds(3, 51, 312, 715);
         modelPane.add(cidmPanel);
 
-        bbPanel.setBounds(3, 51, 312, 615);
+        bbPanel.setBounds(3, 51, 312, 715);
         modelPane.add(bbPanel);
 
-        crPanel.setBounds(3, 51, 312, 615);
+        crPanel.setBounds(3, 51, 312, 715);
         modelPane.add(crPanel);
 
-        nbPanel.setBounds(3, 51, 312, 615);
+        nbPanel.setBounds(3, 51, 312, 715);
         modelPane.add(nbPanel);
 
-        nb2Panel.setBounds(3, 51, 312, 615);
+        nb2Panel.setBounds(3, 51, 312, 715);
         modelPane.add(nb2Panel);
 
-        cumulativePanel.setBounds(3, 51, 312, 615);
+        cumulativePanel.setBounds(3, 51, 312, 715);
         cumulativePanel.setVisible(false);
         modelPane.add(cumulativePanel);
 
@@ -716,15 +714,8 @@ public class UserInterface implements NodeClickListener, SimulationListener, Age
                     throw new RuntimeException("Undefined utility function!");
             }
 
-            double rSigma = suPanel.getRSigma();
-            double rPi = suPanel.getRPi();
-            if (suPanel.isRRandom()) {
-                double rRandom = ThreadLocalRandom.current().nextDouble(0.0, 2.0);
-                rSigma = rRandom;
-                rPi = rRandom;
-            }
-            Agent agent = this.network.addAgent(uf, ds, rSigma, rPi, suPanel.getPhi(),
-                    suPanel.getOmega());
+            // risk perception (manual, random, as in the batches), phi, omega, selective, psi, xi
+            Agent agent = suPanel.getAgentSettings().addAgent(this.network, uf, ds);
             agent.addAgentListener(this);
         }
 
@@ -831,13 +822,8 @@ public class UserInterface implements NodeClickListener, SimulationListener, Age
                         this.crPanel);
 
             case 3:
-                return new NunnerBuskens(
-                        this.nbPanel.getB1(),
-                        this.nbPanel.getB2(),
-                        this.nbPanel.getAlpha(),
-                        this.nbPanel.getC1(),
-                        this.nbPanel.getC2(),
-                        this.nbPanel);
+                // NunnerBuskens(b1, b2, alpha, c1, c2, d, nbPanel)
+                return this.nbPanel.createUtilityFunction();
 
             case 4:
                 return new NunnerBuskens2(

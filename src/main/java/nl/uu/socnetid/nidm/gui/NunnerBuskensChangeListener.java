@@ -54,4 +54,10 @@ public interface NunnerBuskensChangeListener {
      */
     void notifyAlphaChanged();
 
+    /**
+     * Entry point for changes in d, the weight of the perceived local risk of infection
+     * against the perceived global risk.
+     */
+    void notifyDChanged();
+
 }
