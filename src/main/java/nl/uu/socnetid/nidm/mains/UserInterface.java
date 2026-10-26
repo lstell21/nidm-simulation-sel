@@ -846,11 +846,33 @@ public class UserInterface implements NodeClickListener, SimulationListener, Age
      * @return the selected disease
      */
     private DiseaseSpecs getDiseaseSpecs() {
+        // sigma, gamma and tau from the panel of the selected model, which shows its own fields
+        // for them (previously always the hidden CIDM panel's); mu, the care factor that only the
+        // CIDM-type utilities use, from the CIDM panel as before
+        SharedUtilityPanel suPanel;
+        switch (modelTypeCBox.getSelectedIndex()) {
+            case 1:
+                suPanel = this.bbPanel;
+                break;
+            case 2:
+                suPanel = this.crPanel;
+                break;
+            case 3:
+                suPanel = this.nbPanel;
+                break;
+            case 4:
+                suPanel = this.nb2Panel;
+                break;
+            case 0:
+            default:
+                suPanel = this.cidmPanel;
+                break;
+        }
         return new DiseaseSpecs(
                 DiseaseType.SIR,
-                this.cidmPanel.getTau(),
-                this.cidmPanel.getSigma(),
-                this.cidmPanel.getGamma(),
+                suPanel.getTau(),
+                suPanel.getSigma(),
+                suPanel.getGamma(),
                 this.cidmPanel.getMu());
     }
 
