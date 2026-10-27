@@ -1084,7 +1084,11 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         // weakly on omega. Runs A and B (2 Sep 2026) were generated with this
         // behaviour, so it is kept as is for comparability with those batches.
         // See batch/README.md, "Known divergences from the manuscript algorithms".
-        allAgentsAssorted.removeAll(distance2AgentsShuffled);
+        // FIXED ON THIS TEST BRANCH ONLY (bugfix-1087-test, bug check S6, 27 Oct 2026):
+        // the statement below removes the distance-2 agents from allAgentsShuffled, as
+        // intended. selective-contact-reduction, from which the release is made, keeps
+        // the original allAgentsAssorted.removeAll(distance2AgentsShuffled).
+        allAgentsShuffled.removeAll(distance2AgentsShuffled);
         
         while (agentsProcessed.size() < decisions) {
 
