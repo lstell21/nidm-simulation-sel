@@ -49,11 +49,16 @@ MVN=${MVN:-mvn}
 say() { echo "[$(date '+%F %T')] $*"; }
 die() { say "STOPPED: $*"; exit 1; }
 
-MAIN=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git clone; cd to the main clone root first"
-[ "$(cd "$MAIN" && pwd -P)" = "$(pwd -P)" ] || die "run this from the root of the main clone ($MAIN)"
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git clone; cd to the main clone root first"
+[ "$(cd "$TOP" && pwd -P)" = "$(pwd -P)" ] || die "run this from the root of the main clone ($TOP)"
+# POSIX form (/c/Users/... on Git Bash): git rev-parse gives C:/Users/..., which
+# run-batch.sh would take for a relative --out and prefix with its working directory
+MAIN=$(pwd -P)
 [ -f "$MAIN/batch/run-batch.sh" ] || die "$MAIN is not an nidm-simulation-sel clone"
 OUT_ROOT=${OUT_ROOT:-$MAIN/batch-runs}
+if command -v cygpath > /dev/null 2>&1; then OUT_ROOT=$(cygpath -u "$OUT_ROOT"); fi
 case "$OUT_ROOT" in /*) ;; *) OUT_ROOT="$MAIN/$OUT_ROOT" ;; esac
+case "$OUT_ROOT" in /*) ;; *) die "output root $OUT_ROOT is not an absolute POSIX path" ;; esac
 FIX_DIR="$(dirname "$MAIN")/nidm-simulation-sel-bugfix"
 LOCK="$OUT_ROOT/bugcheck.lock"
 HANDOVER="$OUT_ROOT/bugcheck-handover"
