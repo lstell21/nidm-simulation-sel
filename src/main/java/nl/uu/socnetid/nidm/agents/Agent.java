@@ -1075,17 +1075,16 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         List<Agent> allAgentsShuffled = new ArrayList<Agent>(this.getNetwork().getAgents());
         Collections.shuffle(allAgentsShuffled);
         allAgentsShuffled.removeAll(distance1AgentsShuffled);
-        // KNOWN DIVERGENCE -- deliberately left unchanged (decision 8 Oct 2026).
-        // The next statement removes the distance-2 agents from allAgentsAssorted a
-        // second time (line 1071 already did so); the evidently intended target was
-        // allAgentsShuffled, mirroring the two lines above. Consequence: in the
-        // non-assorted branch (randOmega > omega) the "random others" pool still
-        // contains second-degree neighbours, so the effective xi there is slightly
-        // above the configured value and the encounter-set composition depends
-        // weakly on omega. Runs A and B (2 Sep 2026) were generated with this
-        // behaviour, so it is kept as is for comparability with those batches.
-        // See batch/README.md, "Known divergences from the manuscript algorithms".
-        allAgentsAssorted.removeAll(distance2AgentsShuffled);
+        // FIXED ON rerun-fixes (decision 30 Oct 2026; formerly the KNOWN DIVERGENCE at line
+        // 1087). Up to October 2026 the next statement read
+        // allAgentsAssorted.removeAll(distance2AgentsShuffled): it removed the distance-2
+        // agents from allAgentsAssorted a second time (see above), so in the non-assorted
+        // branch (randOmega > omega) the "random others" pool still contained second-degree
+        // neighbours, the effective xi there was slightly above the configured value and the
+        // encounter-set composition depended weakly on omega. Every batch up to October 2026
+        // (Runs A and B, Phase 3, the mechanism run) was generated with that behaviour.
+        // See batch/README.md, "Fixes on rerun-fixes".
+        allAgentsShuffled.removeAll(distance2AgentsShuffled);
         
         while (agentsProcessed.size() < decisions) {
 

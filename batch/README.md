@@ -627,28 +627,33 @@ generated without them.
   before and the index case stays the same agent. `simulation-summary.csv`
   ends with `paired.start.identical` (BOTH batches only): `true` when the
   SHA-256 of the canonical edge list is the same at the start of both arms.
+- **The random-others pool excludes second-degree neighbours**
+  (`Agent.java:1087`; see "Known divergences" below):
+  `allAgentsShuffled.removeAll(distance2AgentsShuffled)` instead of
+  `allAgentsAssorted.removeAll(…)`, as on the test branch `bugfix-1087-test`
+  (bug check S6), with its unit test `AgentDecisionPoolTest` (the random-others
+  pool contains neither direct contacts nor second-degree neighbours; the
+  assorted pools are unchanged).
 
 ## Known divergences from the manuscript algorithms
 
-- **`Agent.java` line 1076 (line 1086 since the explanatory comment block was
-  added on 8 Oct 2026) removes from the wrong list.** The statement reads
-  `allAgentsAssorted.removeAll(distance2AgentsShuffled);` where
-  `allAgentsShuffled.removeAll(distance2AgentsShuffled);` was evidently intended
-  (lines 1073-1075 build the shuffled pool; line 1071 already stripped the
-  distance-2 agents from the assorted one). Consequence: in the non-assorted
-  branch (`randOmega > omega`) the "random others" pool still contains
-  second-degree neighbours, while the assorted pool has them removed twice.
-  Effect: the effective ξ is slightly above 0.20 in the random branch, and the
-  encounter-set composition depends weakly on ω. Runs A and B (2 Sep 2026) and,
-  if inherited from `hnunner/nidm-simulation`, the preprint batch were generated
-  with this behaviour. Decision 8 Oct 2026: document, do not change, so that
-  Phase 3 stays comparable with Runs A and B. A matching comment sits above the
-  statement in `Agent.java`.
+- **`Agent.java` line 1087 removed from the wrong list — fixed on
+  `rerun-fixes`, present in every batch up to October 2026.** The statement
+  read `allAgentsAssorted.removeAll(distance2AgentsShuffled);` where
+  `allAgentsShuffled.removeAll(distance2AgentsShuffled);` was evidently
+  intended. Consequence: in the non-assorted branch (`randOmega > omega`) the
+  "random others" pool still contained second-degree neighbours, while the
+  assorted pool had them removed twice; the effective ξ was slightly above 0.20
+  in the random branch, and the encounter-set composition depended weakly on
+  ω. Runs A and B (2 Sep 2026), Phase 3, the mechanism run and, if inherited
+  from `hnunner/nidm-simulation`, the preprint batch were generated with this
+  behaviour (decision 8 Oct 2026: document, do not change; bug check S6 on
+  branch `bugfix-1087-test`, 27 Oct 2026). See "Fixes on `rerun-fixes`".
 - **Encounter categories are drawn per decision, not as up-front counts.** The
   code draws one category per network decision with probabilities ψ, ξ and
-  1−ψ−ξ (`randPsi` drawn at `Agent.java` 1101; branches at 1115, 1124 and
-  1134), without replacement, and a decision whose list is exhausted falls
-  through to the "all agents" pool (1134: `drawBase == null ||
+  1−ψ−ξ (`randPsi` drawn at `Agent.java` 1102; branches at 1116, 1125 and
+  1135), without replacement, and a decision whose list is exhausted falls
+  through to the "all agents" pool (1135: `drawBase == null ||
   drawBase.isEmpty() || …`). Manuscript Algorithm 5 (`30_model.tex` 160–184)
   draws n_neighs ~ Binomial(φ, ψ) and n_neighs² ~ Binomial(φ, ξ) up front,
   clamps them to the list lengths (the second also to φ − n_neighs) and gives
@@ -658,10 +663,10 @@ generated without them.
   then clamps, which at φ = 16, ψ = 0.4, ξ = 0.2 binds in 0.4 % of draws. Both
   route decisions an exhausted list cannot serve to the remaining agents. The
   pools differ: Algorithm 5's random pool excludes only the agent itself, the
-  code's excludes first- and second-degree neighbours (subject to the bug in
-  the previous bullet). Algorithm 5 line 184 also writes n_{n_1}, n_{n_2} for
-  n_neighs, n_neighs².
-- **`Agent.java` line 1123 (now 1134) duplicates a condition.** The test reads
+  code's excludes first- and second-degree neighbours (up to October 2026
+  subject to the bug in the previous bullet). Algorithm 5 line 184 also writes
+  n_{n_1}, n_{n_2} for n_neighs, n_neighs².
+- **`Agent.java` line 1123 (now 1135) duplicates a condition.** The test reads
   `(randPsi > psi+xi) && (randPsi > psi+xi)`; the second conjunct repeats the
   first. Harmless — it evaluates identically to the single condition.
 
