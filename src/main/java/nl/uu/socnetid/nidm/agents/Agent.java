@@ -1547,8 +1547,14 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         return Long.valueOf(agent2.getId()) > Long.valueOf(agent1.getId()) ? agent2 : agent1;
     }
 
+    /**
+     * Gets the id of a new edge: the lower agent id, "-", the higher agent id. Until rerun-fixes
+     * the ids were concatenated without a separator, so pairs such as 1-112 and 11-12 shared the
+     * id "1112" (from N = 112 on). Ties are looked up by adjacency (hasEdgeBetween,
+     * getEdgeBetween), never by id, so edges read from DGS files with the old ids still work.
+     */
     private String getEdgeId(Agent agent1, Agent agent2) {
-        return this.getAgent1(agent1, agent2).getId().concat(this.getAgent2(agent1, agent2).getId());
+        return this.getAgent1(agent1, agent2).getId() + "-" + this.getAgent2(agent1, agent2).getId();
     }
 
     /**
@@ -1568,7 +1574,7 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         String edgeId = this.getEdgeId(this, newConnection);
 
         Network network = this.getNetwork();
-        if (network.getEdge(edgeId) == null) {
+        if (!this.hasEdgeBetween(newConnection)) {
             Agent agent1 = this.getAgent1(this, newConnection);
             Agent agent2 = this.getAgent2(this, newConnection);
             network.addEdge(edgeId, agent1.getId(), agent2.getId());
@@ -1584,7 +1590,7 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      * @return true if there is a connection, false otherwise
      */
     public boolean isDirectlyConnectedTo(Agent agent) {
-        return this.getNetwork().getEdge(this.getEdgeId(this, agent)) != null;
+        return this.hasEdgeBetween(agent);
     }
 
     /**
@@ -1598,7 +1604,7 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         Iterator<Agent> neighborIt = this.getNeighborNodeIterator();
         while (neighborIt.hasNext()) {
             Agent neighbor = neighborIt.next();
-            if (this.getNetwork().getEdge(this.getEdgeId(neighbor, agent)) != null) {
+            if (neighbor.hasEdgeBetween(agent)) {
                 return true;
             }
         }
@@ -1668,18 +1674,12 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
             return;
         }
 
-        // edge id consistency
-        ArrayList<Agent> tmpAgents = new ArrayList<Agent>();
-        tmpAgents.add(this);
-        tmpAgents.add(connection);
-        Collections.sort(tmpAgents);
-
-        // remove
+        // remove the edge between the two agents, found by adjacency (until rerun-fixes by an id
+        // built without a separator, which could name another pair's edge; see getEdgeId)
         Network network = this.getNetwork();
-        String edgeId = String.valueOf(tmpAgents.get(0).getId()) + String.valueOf(tmpAgents.get(1).getId());
-        Edge edge = network.getEdge(edgeId);
+        Edge edge = this.getEdgeBetween(connection);
         if (edge != null) {
-            network.removeEdge(edgeId);
+            network.removeEdge(edge);
             notifyConnectionRemoved(edge);
         }
     }

@@ -671,6 +671,21 @@ generated without them.
   (bug check S6), with its unit test `AgentDecisionPoolTest` (the random-others
   pool contains neither direct contacts nor second-degree neighbours; the
   assorted pools are unchanged).
+- **Edge ids with a separator; ties looked up by adjacency** (present in every
+  batch with N ≥ 112 up to October 2026). An edge id was the two agent ids
+  concatenated without a separator, so from N = 112 on two pairs could share
+  one: (d, xyz) and (dx, yz), e.g. 1-112 and 11-12 both gave `1112` (145
+  couples at N = 160, 486 at 240, 862 at 320, 1,269 at 400, 1,521 at 480; none
+  at N = 80). While one pair of a couple was tied, the other counted as tied
+  (`Agent.isDirectlyConnectedTo` looked the id up): its tie could not form, and
+  two neighbours of an agent that formed such a pair counted as a closed triad
+  in the utility (`StatsComputer.computeLocalAgentConnectionsStats`). Edge ids
+  are now `lower id-higher id` (`Agent.getEdgeId`), and every tie lookup goes
+  by adjacency (`hasEdgeBetween`, `getEdgeBetween`; `isDirectlyConnectedTo`,
+  `isConnectedToAtDistance2`, `addConnection`, `removeConnection`), so edges
+  read from DGS files with old ids still work. No CSV column changes (the CSVs
+  carry agent ids, never edge ids); edge ids in GEXF and DGS output now read
+  `a-b`. Unit test `AgentEdgeIdTest`.
 
 ## Known divergences from the manuscript algorithms
 
