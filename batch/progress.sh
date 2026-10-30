@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 #
-# Live progress for a Phase 2 or Phase 3 batch driven by run-chunked.sh.
+# Live progress for a Phase 2 or Phase 3 batch driven by run-chunked.sh, or for
+# the exploratory batch driven by exploratory.sh (its arms EX-A, EX-B, EX-P take
+# the place of the chunks).
 #
 # run-batch.sh prints its per-shard results only after the wait loop returns, so
 # driver.log goes quiet for the length of a chunk. The shards themselves write
 # their simulation-summary.csv incrementally, so counting rows there is the way
 # to see progress while it is happening.
 #
-# Usage:  ./batch/progress.sh [runA|runB|p3]
+# Usage:  ./batch/progress.sh [runA|runB|p3|exploratory]
 #
 # For a live view use ./batch/start.sh <arm>, which calls this every INTERVAL
 # seconds.
@@ -32,16 +34,21 @@ ROOT="$REPO/batch-runs/$ARM"
 printf -v now '%(%s)T' -1
 hms() { printf -v "$1" '%d:%02d:%02d' $(($2 / 3600)) $((($2 % 3600) / 60)) $(($2 % 60)); }
 
-done_chunks=0; active=""
-for c in "$ROOT"/c*/; do
+# run-chunked.sh's chunks c<i>, or exploratory.sh's arms EX-A, EX-B, EX-P (they
+# run in that order, so the last one without .done is the one in flight)
+done_chunks=0; active=""; unit="chunk"
+for c in "$ROOT"/c*/ "$ROOT"/EX-*/; do
     [ -d "$c" ] || continue
+    case "$c" in "$ROOT"/EX-*) unit="arm" ;; esac
     if [ -f "$c/.done" ]; then done_chunks=$((done_chunks + 1)); else active="${c%/}"; fi
 done
 
-# The files whose data rows we need: every staged summary, plus the in-flight
-# shards' own. One awk pass counts them all; "<file> <lines>" per file.
+# The files whose data rows we need: every staged summary (a completed arm's
+# split/ for the exploratory batch), plus the in-flight shards' own. One awk
+# pass counts them all; "<file> <lines>" per file.
 files=()
-for f in "$ROOT"/merged/*/data/nunnerbuskens/simulation-summary.csv; do
+for f in "$ROOT"/merged/*/data/nunnerbuskens/simulation-summary.csv \
+         "$ROOT"/EX-*/split/*/data/nunnerbuskens/simulation-summary.csv; do
     [ -f "$f" ] && files+=("$f")
 done
 if [ -n "$active" ]; then
@@ -59,13 +66,13 @@ rows() { local _l=${lines["$1"]:-0}; printf -v "$2" '%d' $(( _l > 0 ? _l - 1 : 0
 
 staged=0
 for f in "${files[@]}"; do
-    case "$f" in "$ROOT"/merged/*) rows "$f" r; staged=$((staged + r)) ;; esac
+    case "$f" in "$ROOT"/merged/*|"$ROOT"/EX-*/split/*) rows "$f" r; staged=$((staged + r)) ;; esac
 done
 
-echo "$ARM: $done_chunks chunk(s) complete, $staged simulations staged"
+echo "$ARM: $done_chunks $unit(s) complete, $staged simulations staged"
 
 if [ -z "$active" ]; then
-    echo "  no chunk in flight"
+    echo "  no $unit in flight"
     exit 0
 fi
 
@@ -107,9 +114,9 @@ done
 
 if [ "$tot_target" -gt 0 ] && [ "$tot_done" -gt 0 ]; then
     hms el $((now - earliest))
-    echo "  chunk: $tot_done/$tot_target sims ($((100 * tot_done / tot_target))%), elapsed $el"
+    echo "  $unit: $tot_done/$tot_target sims ($((100 * tot_done / tot_target))%), elapsed $el"
     if [ "$worst" -gt 0 ]; then
         hms eta "$worst"
-        echo "  chunk ETA $eta (slowest shard)"
+        echo "  $unit ETA $eta (slowest shard)"
     fi
 fi
