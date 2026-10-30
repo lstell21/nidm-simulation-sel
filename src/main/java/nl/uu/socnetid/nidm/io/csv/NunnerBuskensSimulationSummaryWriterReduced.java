@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import nl.uu.socnetid.nidm.data.out.DataGeneratorData;
+import nl.uu.socnetid.nidm.data.out.EpidemicStructures;
 import nl.uu.socnetid.nidm.data.out.LogValues;
 import nl.uu.socnetid.nidm.data.out.NunnerBuskensParameters;
 import nl.uu.socnetid.nidm.stats.AgentStatsPost;
@@ -138,6 +139,10 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
             cols.add(LogValues.DV_CHECK_INFECTED_COST_N.toString());
             cols.add(LogValues.DV_CHECK_INFECTED_COST_DIFF.toString());
+        }
+        // paired design: both arms started from the same network
+        if (this.dgData.getUtilityModelParams().getEpStructure() == EpidemicStructures.BOTH) {
+            cols.add(LogValues.DV_PAIRED_START_IDENTICAL.toString());
         }
 
         writeLine(cols);
@@ -262,6 +267,10 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
             currData.add(String.valueOf(this.dgData.getSimStats().getCheckInfectedCostN()));
             currData.add(String.valueOf(this.dgData.getSimStats().getCheckInfectedCostDiff()));
+        }
+        // paired design: both arms started from the same network
+        if (this.dgData.getUtilityModelParams().getEpStructure() == EpidemicStructures.BOTH) {
+            currData.add(String.valueOf(this.dgData.getSimStats().isPairedStartIdentical()));
         }
 
         writeLine(currData);

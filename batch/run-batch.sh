@@ -41,7 +41,9 @@
 #   --ep-structure V  set nb.ep.structure to dynamic|static|both. both = paired
 #                     static then dynamic epidemic on the same pre-epidemic
 #                     network and index case (NunnerBuskensDataGenerator lines
-#                     464-475); SelSWIDM-analysis currently refuses such
+#                     485-505; the dynamic arm's start is checked in the
+#                     summary column paired.start.identical, rerun-fixes
+#                     only); SelSWIDM-analysis currently refuses such
 #                     batches (assert_dynamic_only in R/00_data-wrangling.R)
 #                     until its readers are made design-aware
 #   --gamma-min V / --gamma-max V   override nb.gamma.random.min/max

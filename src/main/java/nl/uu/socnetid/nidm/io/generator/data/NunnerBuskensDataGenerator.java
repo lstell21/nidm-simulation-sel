@@ -485,12 +485,21 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             if (ump.getEpStructure() == EpidemicStructures.BOTH) {
                 ump.setCurrEpStructure(EpidemicStructures.STATIC);
                 this.simulatePreEpidemic();
+                // the network both arms start from
+                List<long[]> preEpidemicTies = this.network.getTies();
+                String startHashStatic = this.network.getEdgeListHash();
                 this.simulateEpidemic(ds, indexCase, true);
                 // write agent data
                 if (PropertiesHandler.getInstance().isExportAgentDetails() ||
                         PropertiesHandler.getInstance().isExportAgentDetailsReduced()) {
                             this.adWriter.writeCurrentData();
                 }
+                // agents revise their ties in the round in which the frozen outbreak ends
+                // (Simulation.computeSingleRound), so the adapting arm would start from a slightly
+                // different network: restore the ties (no utilities, no random numbers)
+                this.network.restoreTies(preEpidemicTies);
+                this.dgData.getSimStats().setPairedStartIdentical(
+                        startHashStatic.equals(this.network.getEdgeListHash()));
                 ump.setCurrEpStructure(EpidemicStructures.DYNAMIC);
                 this.simulateEpidemic(ds, indexCase, false);
                 this.simulatePostEpidemic();

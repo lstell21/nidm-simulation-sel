@@ -53,6 +53,8 @@ public class SimulationStats {
     // shadow check of the infected agents' disease cost (check.infected.cost)
     private long checkInfectedCostN;
     private long checkInfectedCostDiff;
+    // paired design: whether the adapting arm started from the network the frozen arm started from
+    private boolean pairedStartIdentical;
     private SimulationStage simStage;
     private int rounds;
     private int currRound = 0;
@@ -337,6 +339,22 @@ public class SimulationStats {
     }
 
     /**
+     * @return whether the edge lists at the start of the frozen and the adapting arm were identical
+     *          (paired design)
+     */
+    public boolean isPairedStartIdentical() {
+        return pairedStartIdentical;
+    }
+
+    /**
+     * @param pairedStartIdentical
+     *          whether the edge lists at the start of the frozen and the adapting arm were identical
+     */
+    public void setPairedStartIdentical(boolean pairedStartIdentical) {
+        this.pairedStartIdentical = pairedStartIdentical;
+    }
+
+    /**
      * @return the shotsGiven
      */
     public int getShotsGiven() {
@@ -403,6 +421,7 @@ public class SimulationStats {
         this.epidemicPeakStatic = 0;
         this.checkInfectedCostN = 0;
         this.checkInfectedCostDiff = 0;
+        this.pairedStartIdentical = false;
         this.shotsGiven = 0;
         this.professionsReceivedShots = new HashMap<String, Integer>();
     }

@@ -202,15 +202,18 @@ pre-epidemic network, seeds one index case, runs the epidemic once on the
 **frozen** network (no tie formation or dissolution while an infection is
 active — `Simulation.java:300`), resets the disease states, and then runs it
 again from the **same index case** with the network dynamic
-(`NunnerBuskensDataGenerator.java:464-475`). The starting network of the
-dynamic arm is the pre-epidemic network **after one round of tie revisions**:
-in the round in which the static outbreak ends, the infection is marked
-defeated and agents revise ties in that same round, also in the static arm
-(`Simulation.java:296-302`), and the generator reuses the network object. In
-Phase 3 this changed 86–88 % of starting networks, by small amounts that do not
-depend on `s` (mean |Δ| degree ≈ 0.03 at degree ≈ 7.7, clustering and
-assortativity ≈ 0.004–0.005; no infection is present in that round, so
-selection does not act). Each simulation therefore
+(`NunnerBuskensDataGenerator.java:485-505`). Up to October 2026 the starting
+network of the dynamic arm was the pre-epidemic network **after one round of
+tie revisions**: in the round in which the static outbreak ends, the infection
+is marked defeated and agents revise ties in that same round, also in the
+static arm (`Simulation.java:296-302`), and the generator reuses the network
+object. In Phase 3 this changed 86–88 % of starting networks, by small amounts
+that do not depend on `s` (mean |Δ| degree ≈ 0.03 at degree ≈ 7.7, clustering
+and assortativity ≈ 0.004–0.005; no infection is present in that round, so
+selection does not act). On `rerun-fixes` the generator records the tie list
+after the burn-in and restores it before the dynamic arm, so both arms start
+from the same network; `simulation-summary.csv` ends with
+`paired.start.identical` (see "Fixes on `rerun-fixes`"). Each simulation therefore
 yields a paired outcome: `net.static.pct.rec` (no adaptation) against
 `net.dynamic.pct.rec` (adaptation, selective or random according to `s`).
 The static arm does not depend on `s` (selection acts only while an infection
@@ -240,8 +243,8 @@ counterfactual alongside.
 
 | file | change against a dynamic batch |
 |---|---|
-| `simulation-summary.csv` | `nb.ep.structure` is `both` in every row. The `net.static.*` block (`net.static.pct.rec`, `net.static.epidemic.duration`, `net.static.epidemic.peak.size`, `net.static.av.clustering.post`, …) is populated instead of empty; `net.dynamic.*` as before. `net.*.pre.epidemic.*` describes the one shared pre-epidemic network. |
-| `round-summary.csv` | `nb.ep.structure` is `static` or `dynamic` **per round** (`NunnerBuskensRoundSummaryWriter.java:79`). Every `sim.cnt` has two `active-epidemic` stretches in `sim.stage` (values are lower-case in the CSV): the static one directly after the burn-in, then one `stopped-epidemic` round still labelled `static` (the tie-revision round described above), then the dynamic one (no post-epidemic phase in between; `sim.round` keeps counting). The dynamic outbreak therefore does **not** start at round ζ+1 = 11. |
+| `simulation-summary.csv` | `nb.ep.structure` is `both` in every row. The `net.static.*` block (`net.static.pct.rec`, `net.static.epidemic.duration`, `net.static.epidemic.peak.size`, `net.static.av.clustering.post`, …) is populated instead of empty; `net.dynamic.*` as before. `net.*.pre.epidemic.*` describes the one shared pre-epidemic network. On `rerun-fixes` the last column is `paired.start.identical`. |
+| `round-summary.csv` | `nb.ep.structure` is `static` or `dynamic` **per round** (`NunnerBuskensRoundSummaryWriter.java:79`). Every `sim.cnt` has two `active-epidemic` stretches in `sim.stage` (values are lower-case in the CSV): the static one directly after the burn-in, then one `stopped-epidemic` round still labelled `static` (the tie-revision round described above; on `rerun-fixes` its tie changes are undone before the dynamic arm, so this row's network measures are not the dynamic arm's start), then the dynamic one (no post-epidemic phase in between; `sim.round` keeps counting). The dynamic outbreak therefore does **not** start at round ζ+1 = 11. |
 | `config.properties` (per shard) | `nb.ep.structure=both` |
 
 What this meant for `SelSWIDM-analysis` (implemented 9 Oct 2026 as design
@@ -613,6 +616,17 @@ generated without them.
   differs), and each differing comparison is logged to `shard.log` (WARN,
   both utilities and both outcomes). The check reuses the utilities the
   decision was taken on: it changes no decision and draws no random numbers.
+- **The paired design's adapting arm starts from the network the frozen arm
+  started from** (`--ep-structure both`). Before, agents revised their ties in
+  the round in which the frozen outbreak ended (see Phase 3 → Purpose), and the
+  adapting arm started from that network. The generator now records the tie
+  list right after the burn-in and, after the frozen arm, restores exactly
+  that list (`Network.restoreTies`: removes the ties not in it, adds the
+  missing ones; no utility evaluations, no random numbers; `shard.log` logs how
+  many ties each restore removed and added). Disease states are reset as
+  before and the index case stays the same agent. `simulation-summary.csv`
+  ends with `paired.start.identical` (BOTH batches only): `true` when the
+  SHA-256 of the canonical edge list is the same at the start of both arms.
 
 ## Known divergences from the manuscript algorithms
 
