@@ -58,6 +58,7 @@ import nl.uu.socnetid.nidm.networks.Network;
 import nl.uu.socnetid.nidm.stats.AgentConnectionStats;
 import nl.uu.socnetid.nidm.stats.DijkstraShortestPath;
 import nl.uu.socnetid.nidm.stats.StatsComputer;
+import nl.uu.socnetid.nidm.utility.InfectedCostCheck;
 import nl.uu.socnetid.nidm.utility.Utility;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
@@ -1178,7 +1179,15 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      * @return true if the new connection adds value to the overall utility of an agent
      */
     public boolean newConnectionValuable(Agent newConnection) {
-        return this.getUtilityWith(newConnection).getOverallUtility() >= this.getUtility().getOverallUtility();
+        Utility utilityWith = this.getUtilityWith(newConnection);
+        Utility utility = this.getUtility();
+        boolean valuable = utilityWith.getOverallUtility() >= utility.getOverallUtility();
+        // shadow check (check.infected.cost); observes only, null when off or not infected
+        InfectedCostCheck infectedCostCheck = this.getInfectedCostCheck();
+        if (infectedCostCheck != null) {
+            infectedCostCheck.compare("newConnectionValuable", this, newConnection, utilityWith, utility, false, valuable);
+        }
+        return valuable;
     }
 
     /**
@@ -1190,12 +1199,18 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      */
     public boolean connectTo(Agent agent) {
         // other agent accepting connection?
-        double currUtility = agent.getUtility().getOverallUtility();
+        Utility currUtility = agent.getUtility();
         // TODO use connectionValuableWith to avoid GUI glitches
         agent.addConnection(this);
-        double newUtility = agent.getUtility().getOverallUtility();
+        Utility newUtility = agent.getUtility();
         agent.removeConnection(this);
-        if (newUtility >= currUtility) {
+        boolean accepted = newUtility.getOverallUtility() >= currUtility.getOverallUtility();
+        // shadow check (check.infected.cost) for the accepting agent; observes only
+        InfectedCostCheck infectedCostCheck = agent.getInfectedCostCheck();
+        if (infectedCostCheck != null) {
+            infectedCostCheck.compare("connectTo (acceptance)", agent, this, newUtility, currUtility, false, accepted);
+        }
+        if (accepted) {
             addConnection(agent);
             trackAcceptedRequestOut();
             agent.trackAcceptedRequestIn();
@@ -1219,7 +1234,31 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      * @return true if the existing connection create more costs than it provides benefits
      */
     public boolean existingConnectionTooCostly(Agent existingConnection) {
-        return this.getUtilityWithout(existingConnection).getOverallUtility() > this.getUtility().getOverallUtility();
+        Utility utilityWithout = this.getUtilityWithout(existingConnection);
+        Utility utility = this.getUtility();
+        boolean tooCostly = utilityWithout.getOverallUtility() > utility.getOverallUtility();
+        // shadow check (check.infected.cost); observes only, null when off or not infected
+        InfectedCostCheck infectedCostCheck = this.getInfectedCostCheck();
+        if (infectedCostCheck != null) {
+            infectedCostCheck.compare("existingConnectionTooCostly", this, existingConnection, utilityWithout, utility,
+                    true, tooCostly);
+        }
+        return tooCostly;
+    }
+
+    /**
+     * Gets the shadow check of the infected agents' disease cost (check.infected.cost) for a
+     * decision of this agent. Reads the disease group only; never calls
+     * Network.hasActiveInfection(), which writes a network attribute.
+     *
+     * @return the check if it is on and this agent is infected, null otherwise
+     */
+    private InfectedCostCheck getInfectedCostCheck() {
+        InfectedCostCheck infectedCostCheck = this.getNetwork().getInfectedCostCheck();
+        if (infectedCostCheck == null || !this.isInfected()) {
+            return null;
+        }
+        return infectedCostCheck;
     }
 
     /**

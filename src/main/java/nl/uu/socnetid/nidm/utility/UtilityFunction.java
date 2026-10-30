@@ -182,6 +182,21 @@ public abstract class UtilityFunction {
         return p * s;
     }
 
+    /**
+     * Computes the overall utility with the disease costs an infected agent had before they were
+     * corrected to sigma on rerun-fixes (shadow check, check.infected.cost). Only NunnerBuskens
+     * changed that cost; for every other utility function this is the overall utility itself.
+     *
+     * @param utility
+     *          the utility as computed with the current disease costs
+     * @param agent
+     *          the agent the utility was computed for
+     * @return the overall utility with the old disease costs
+     */
+    public double getOverallUtilityOldInfectedCosts(Utility utility, Agent agent) {
+        return utility.getOverallUtility();
+    }
+
 
     /* (non-Javadoc)
      * @see java.lang.Object#toString()

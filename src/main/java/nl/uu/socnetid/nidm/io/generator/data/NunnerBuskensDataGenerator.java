@@ -64,6 +64,7 @@ import nl.uu.socnetid.nidm.stats.NetworkStats;
 import nl.uu.socnetid.nidm.stats.NetworkStatsPost;
 import nl.uu.socnetid.nidm.stats.NetworkStatsPre;
 import nl.uu.socnetid.nidm.system.PropertiesHandler;
+import nl.uu.socnetid.nidm.utility.InfectedCostCheck;
 import nl.uu.socnetid.nidm.utility.NunnerBuskens;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
@@ -92,6 +93,8 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
     private GEXFWriter gexfWriter;
     // tie-level output (export.tie.events); null when off
     private TieEventLog tieEventLog;
+    // shadow check of the infected agents' disease cost (check.infected.cost); null when off
+    private InfectedCostCheck infectedCostCheck;
 
 
     /**
@@ -147,6 +150,10 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
         // tie events and transmissions during active epidemics
         if (PropertiesHandler.getInstance().isExportTieEvents()) {
             this.tieEventLog = new TieEventLog(getExportPath(), this.dgData);
+        }
+        // shadow check of the infected agents' disease cost (two summary columns)
+        if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
+            this.infectedCostCheck = new InfectedCostCheck();
         }
     }
 
@@ -431,6 +438,10 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             if (this.tieEventLog != null) {
                 this.tieEventLog.attach(this.network);
             }
+            if (this.infectedCostCheck != null) {
+                this.infectedCostCheck.reset();
+                this.network.setInfectedCostCheck(this.infectedCostCheck);
+            }
 
             // begin: GEXF export
             if (PropertiesHandler.getInstance().isExportGexf()) {
@@ -492,6 +503,10 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             }
 
             // write summary data
+            if (this.infectedCostCheck != null) {
+                this.dgData.getSimStats().setCheckInfectedCost(this.infectedCostCheck.getN(),
+                        this.infectedCostCheck.getDiff());
+            }
             if (PropertiesHandler.getInstance().isExportSummary()) {
                 this.ssWriter.writeCurrentData();
             }

@@ -50,6 +50,9 @@ public class SimulationStats {
     private int epidemicPeakSizeDynamic;
     private int epidemicPeakStatic;
     private int epidemicPeakDynamic;
+    // shadow check of the infected agents' disease cost (check.infected.cost)
+    private long checkInfectedCostN;
+    private long checkInfectedCostDiff;
     private SimulationStage simStage;
     private int rounds;
     private int currRound = 0;
@@ -309,6 +312,31 @@ public class SimulationStats {
     }
 
     /**
+     * @return the number of tie decisions of infected agents the shadow check evaluated a second time
+     */
+    public long getCheckInfectedCostN() {
+        return checkInfectedCostN;
+    }
+
+    /**
+     * @return the number of those decisions whose outcome differs with the old disease cost d * sigma
+     */
+    public long getCheckInfectedCostDiff() {
+        return checkInfectedCostDiff;
+    }
+
+    /**
+     * @param n
+     *          the number of tie decisions of infected agents the shadow check evaluated a second time
+     * @param diff
+     *          the number of those decisions whose outcome differs with the old disease cost d * sigma
+     */
+    public void setCheckInfectedCost(long n, long diff) {
+        this.checkInfectedCostN = n;
+        this.checkInfectedCostDiff = diff;
+    }
+
+    /**
      * @return the shotsGiven
      */
     public int getShotsGiven() {
@@ -373,6 +401,8 @@ public class SimulationStats {
         this.epidemicPeakSizeStatic = 0;
         this.epidemicPeakDynamic = 0;
         this.epidemicPeakStatic = 0;
+        this.checkInfectedCostN = 0;
+        this.checkInfectedCostDiff = 0;
         this.shotsGiven = 0;
         this.professionsReceivedShots = new HashMap<String, Integer>();
     }

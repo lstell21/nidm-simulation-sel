@@ -57,7 +57,13 @@
 #                     infection, infector attributed at random among the
 #                     infected neighbours with a separate random stream; see
 #                     TieEventLog.java). Off by default.
-#   --heap SIZE       -Xmx per shard (default 1g)
+#   --check-infected-cost  set check.infected.cost=true: every tie decision of an
+#                     infected agent is evaluated a second time with the disease
+#                     cost before rerun-fixes (d * sigma instead of sigma) and
+#                     counted in simulation-summary.csv (check.infected.cost.n,
+#                     check.infected.cost.diff; see InfectedCostCheck.java).
+#                     Changes no decision. Off by default.
+#   --heap SIZE      -Xmx per shard (default 1g)
 #   --out DIR         output root (default batch-runs/<timestamp>)
 #   --jar PATH        jar to run (default target/nidm-4.0.1.jar with
 #                     target/classes, i.e. a Maven build; without that build,
@@ -99,7 +105,7 @@ ZETA=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
 # than opt-in; --phi V is the escape hatch for a deliberately flat proportion.
 ENCOUNTERS=16; PHI=""
 GAMMA_MIN=""; GAMMA_MAX=""; ALPHA_MIN=""; ALPHA_MAX=""; SIGMA_MIN=""; SIGMA_MAX=""
-ROUND_SUMMARY=""; CENTRALITIES=""; TIE_EVENTS=""
+ROUND_SUMMARY=""; CENTRALITIES=""; TIE_EVENTS=""; CHECK_INFECTED_COST=""
 EP_STRUCTURE=""
 HEAP="1g"
 OUT=""
@@ -134,6 +140,7 @@ while [ $# -gt 0 ]; do
         --no-round-summary) ROUND_SUMMARY=false; shift ;;
         --no-centralities)  CENTRALITIES=false; shift ;;
         --tie-events)       TIE_EVENTS=true; shift ;;
+        --check-infected-cost) CHECK_INFECTED_COST=true; shift ;;
         --ep-structure)     EP_STRUCTURE="$2"; shift 2 ;;
         --heap)             HEAP="$2"; shift 2 ;;
         --out)              OUT="$2"; shift 2 ;;
@@ -220,6 +227,7 @@ echo "  output          : $OUT"
 [ -n "$PHI" ]           && echo "  phi (flat)      : $PHI"
 [ -n "$CENTRALITIES" ]  && echo "  centralities    : $CENTRALITIES"
 [ -n "$TIE_EVENTS" ]    && echo "  tie events      : on (tie-events.csv, transmissions.csv)"
+[ -n "$CHECK_INFECTED_COST" ] && echo "  shadow check    : check.infected.cost=true (infected cost sigma vs d * sigma)"
 [ -n "$SIGMA_RANDOM" ]  && echo "  sigma           : random"
 [ -n "$ROUND_SUMMARY" ] && echo "  round summary   : $ROUND_SUMMARY"
 [ -n "$EP_STRUCTURE" ] && echo "  ep structure    : $EP_STRUCTURE"
@@ -251,6 +259,7 @@ mkdir -p "$OUT/work" "$OUT/split"
     echo "encounters      : ${ENCOUNTERS:-flat phi $PHI}"
     echo "centralities    : ${CENTRALITIES:-config (true)}"
     echo "tie events      : ${TIE_EVENTS:-config (false)}"
+    echo "shadow check    : check.infected.cost=${CHECK_INFECTED_COST:-config (false)}"
     echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
     if [ -n "$BATCH_MODE" ]; then
         # "git commit" above is this clone's; the classes that run are the jar's,
@@ -329,6 +338,14 @@ while read -r NAME N SHARD_REPS; do
             sed -i "s|^export\.tie\.events=.*|export.tie.events=$TIE_EVENTS|" "$C"
         else
             echo "export.tie.events=$TIE_EVENTS" >> "$C"
+        fi
+    fi
+    if [ -n "$CHECK_INFECTED_COST" ]; then
+        # as for tie events: configs before rerun-fixes lack the key (read as false)
+        if grep -q '^check\.infected\.cost=' "$C"; then
+            sed -i "s|^check\.infected\.cost=.*|check.infected.cost=$CHECK_INFECTED_COST|" "$C"
+        else
+            echo "check.infected.cost=$CHECK_INFECTED_COST" >> "$C"
         fi
     fi
     [ -n "$EP_STRUCTURE" ] && sed -i "s|^nb\.ep\.structure=.*|nb.ep.structure=$EP_STRUCTURE|" "$C"

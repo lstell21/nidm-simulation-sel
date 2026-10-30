@@ -274,6 +274,11 @@ public class NunnerBuskens extends UtilityFunction implements NunnerBuskensChang
                 break;
 
             case INFECTED:
+                // manuscript Eq. 5: an infected agent's disease cost is sigma, not weighted by d.
+                // Until rerun-fixes it was d * sigma (the local term p * s = sigma times d, plus a
+                // global term of 0); getOverallUtilityOldInfectedCosts keeps that for the shadow check.
+                return agent.getDiseaseSpecs().getSigma();
+
             case RECOVERED:
             case VACCINATED:
             	perceivedGlobalRisk = 0.0;
@@ -286,6 +291,20 @@ public class NunnerBuskens extends UtilityFunction implements NunnerBuskensChang
 		return 
 				this.d * perceivedLocalRisk + 
 				(1 - this.d) * perceivedGlobalRisk;
+    }
+
+    /* (non-Javadoc)
+     * @see nl.uu.socnetid.nidm.utility.UtilityFunction#getOverallUtilityOldInfectedCosts(
+     * nl.uu.socnetid.nidm.utility.Utility, nl.uu.socnetid.nidm.agents.Agent)
+     */
+    @Override
+    public double getOverallUtilityOldInfectedCosts(Utility utility, Agent agent) {
+        if (!agent.isInfected()) {
+            return utility.getOverallUtility();
+        }
+        // the old disease cost: this.d * sigma + (1 - this.d) * 0.0, which is exactly d * sigma
+        double oldDiseaseCosts = this.d * agent.getDiseaseSpecs().getSigma();
+        return utility.getSocialBenefits() - utility.getSocialCosts() - oldDiseaseCosts;
     }
 
     /**

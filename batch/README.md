@@ -590,6 +590,30 @@ A further trim is available but low value: `net.betweenness.pre.epidemic.av`,
 rather than per round — worth roughly 7% at N=320, against a change to the main
 summary schema.
 
+## Fixes on `rerun-fixes`
+
+Decision 30 Oct 2026: every batch is re-run with all known code fixes, one
+commit per fix so that each can be verified on its own. Every batch up to
+October 2026 (Runs A and B, Phase 3, the mechanism run, the bug check) was
+generated without them.
+
+- **An infected agent's disease cost is σ** (manuscript Eq. 5). Before,
+  `UtilityFunction.getDiseaseCosts` returned σ for an infected agent and
+  `NunnerBuskens.getDiseaseCosts` weighted it by d and set the global term to
+  0, so the cost was d·σ. That cost does not depend on the agent's ties, so
+  both definitions should take the same tie decisions; none of the batch CSVs
+  reports utilities. `--check-infected-cost` (key `check.infected.cost`,
+  default `false`; `batch-info.txt` records `shadow check : …`) tests this
+  decision by decision: every comparison of overall utilities that decides a
+  tie for an infected agent — its request (`Agent.newConnectionValuable`), its
+  acceptance of a request (`Agent.connectTo`), its cut
+  (`Agent.existingConnectionTooCostly`) — is evaluated a second time with
+  d·σ. `simulation-summary.csv` then ends with `check.infected.cost.n`
+  (comparisons) and `check.infected.cost.diff` (comparisons whose outcome
+  differs), and each differing comparison is logged to `shard.log` (WARN,
+  both utilities and both outcomes). The check reuses the utilities the
+  decision was taken on: it changes no decision and draws no random numbers.
+
 ## Known divergences from the manuscript algorithms
 
 - **`Agent.java` line 1076 (line 1086 since the explanatory comment block was

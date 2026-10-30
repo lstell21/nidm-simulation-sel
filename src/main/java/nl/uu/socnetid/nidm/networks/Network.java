@@ -55,6 +55,7 @@ import nl.uu.socnetid.nidm.simulation.SimulationListener;
 import nl.uu.socnetid.nidm.io.csv.TieEventLog;
 import nl.uu.socnetid.nidm.stats.DijkstraShortestPath;
 import nl.uu.socnetid.nidm.stats.StatsComputer;
+import nl.uu.socnetid.nidm.utility.InfectedCostCheck;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
 /**
@@ -87,6 +88,8 @@ public class Network extends SingleGraph implements SimulationListener {
 
     // tie-level output (export.tie.events); null when off, so the agents' hooks do nothing
     private TieEventLog tieEventLog = null;
+    // shadow check of the infected agents' disease cost (check.infected.cost); null when off
+    private InfectedCostCheck infectedCostCheck = null;
 
 
     /**
@@ -467,6 +470,25 @@ public class Network extends SingleGraph implements SimulationListener {
      */
     public void setTieEventLog(TieEventLog tieEventLog) {
         this.tieEventLog = tieEventLog;
+    }
+
+    /**
+     * Gets the shadow check of the infected agents' disease cost (check.infected.cost).
+     *
+     * @return the check, or null if it is off
+     */
+    public InfectedCostCheck getInfectedCostCheck() {
+        return this.infectedCostCheck;
+    }
+
+    /**
+     * Sets the shadow check of the infected agents' disease cost (check.infected.cost).
+     *
+     * @param infectedCostCheck
+     *          the check
+     */
+    public void setInfectedCostCheck(InfectedCostCheck infectedCostCheck) {
+        this.infectedCostCheck = infectedCostCheck;
     }
 
     /**

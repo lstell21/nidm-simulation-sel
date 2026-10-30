@@ -34,6 +34,7 @@ import nl.uu.socnetid.nidm.data.out.DataGeneratorData;
 import nl.uu.socnetid.nidm.data.out.LogValues;
 import nl.uu.socnetid.nidm.data.out.NunnerBuskensParameters;
 import nl.uu.socnetid.nidm.stats.AgentStatsPost;
+import nl.uu.socnetid.nidm.system.PropertiesHandler;
 
 /**
  * @author Hendrik Nunner
@@ -131,6 +132,13 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         cols.add(LogValues.DV_NET_DYNAMIC_CONS_OUT_DECLINED_EPIDEMIC.toString());
         cols.add(LogValues.DV_NET_DYNAMIC_CONS_IN_ACCEPTED_EPIDEMIC.toString());
         cols.add(LogValues.DV_NET_DYNAMIC_CONS_IN_DECLINED_EPIDEMIC.toString());
+
+        // CHECKS (last, so the columns above keep their positions)
+        // shadow check of the infected agents' disease cost
+        if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
+            cols.add(LogValues.DV_CHECK_INFECTED_COST_N.toString());
+            cols.add(LogValues.DV_CHECK_INFECTED_COST_DIFF.toString());
+        }
 
         writeLine(cols);
     }
@@ -248,6 +256,13 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         currData.add(String.valueOf(declinedRequestsOutEpidemic));
         currData.add(String.valueOf(acceptedRequestsInEpidemic));
         currData.add(String.valueOf(declinedRequestsInEpidemic));
+
+        // CHECKS
+        // shadow check of the infected agents' disease cost
+        if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
+            currData.add(String.valueOf(this.dgData.getSimStats().getCheckInfectedCostN()));
+            currData.add(String.valueOf(this.dgData.getSimStats().getCheckInfectedCostDiff()));
+        }
 
         writeLine(currData);
     }

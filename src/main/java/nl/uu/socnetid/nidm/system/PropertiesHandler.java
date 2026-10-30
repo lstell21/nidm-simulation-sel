@@ -123,6 +123,8 @@ public class PropertiesHandler {
     private boolean exportAgentDetailsReduced;
     private boolean exportGexf;
     private boolean exportTieEvents;
+    // shadow check of the infected agents' disease cost
+    private boolean checkInfectedCost;
     // data analysis?
     private boolean analyzeData;
 
@@ -549,6 +551,8 @@ public class PropertiesHandler {
         this.exportGexf = Boolean.parseBoolean(configProps.getProperty("export.gexf"));
         // defaults to false when absent, so existing configs produce exactly the existing output
         this.exportTieEvents = Boolean.parseBoolean(configProps.getProperty("export.tie.events", "false"));
+        // defaults to false when absent; adds two summary columns when on, changes no decision
+        this.checkInfectedCost = Boolean.parseBoolean(configProps.getProperty("check.infected.cost", "false"));
 
         // analyze data?
         this.analyzeData = Boolean.parseBoolean(configProps.getProperty("analyze.data"));
@@ -734,6 +738,16 @@ public class PropertiesHandler {
      */
     public boolean isExportTieEvents() {
         return exportTieEvents;
+    }
+
+    /**
+     * Whether every tie decision of an infected agent is evaluated a second time with the disease
+     * cost before rerun-fixes, d * sigma (see InfectedCostCheck).
+     *
+     * @return the checkInfectedCost
+     */
+    public boolean isCheckInfectedCost() {
+        return checkInfectedCost;
     }
 
     /**

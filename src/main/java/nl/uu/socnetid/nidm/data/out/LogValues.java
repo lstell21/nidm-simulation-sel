@@ -571,6 +571,11 @@ public enum LogValues {
     DV_INDEX_DYNAMIC_R_SIGMA("index.dynamic.r.sigma"),
     DV_INDEX_DYNAMIC_R_PI("index.dynamic.r.pi"),
 
+    // CHECKS
+    // shadow check of the infected agents' disease cost (check.infected.cost=true only)
+    DV_CHECK_INFECTED_COST_N("check.infected.cost.n"),
+    DV_CHECK_INFECTED_COST_DIFF("check.infected.cost.diff"),
+
     // OTHERS
     EXPORT_FILENAME("export.filename"),
     IMPORT_FILENAME("import.filename");
