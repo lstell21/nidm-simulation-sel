@@ -351,6 +351,43 @@ which writes a network attribute. With the flag off no extra code runs. See
 - In `--ep-structure both` batches, `transmissions.csv` also holds the
   static arm's infections; they come earlier in `sim.round`.
 
+## Exploratory batch (`exploratory.sh`, before the re-run)
+
+Design diagnostics before the final re-run batches; design and rules are fixed
+in `exploratory_criteria.md` (Claude Science, 30 Oct 2026, section 2). The
+data may be used only for the diagnostics listed there, never for a result.
+`batch/exploratory.sh` runs the three arms one after the other with
+`run-batch.sh`, from the `rerun-fixes` build it makes itself:
+
+| arm | settings | runs |
+|---|---|---|
+| `EX-A` | main design, ω ~ U[0, 1] | 300 per N |
+| `EX-B` | ω = 0 | 150 per N |
+| `EX-P` | `--ep-structure both`, γ ~ U[0.1, 0.2] | 150 pairs per N |
+
+All arms: default N grid, `--encounters 16`, `--no-centralities`, round
+summaries on. Run from the root of a clean clone on `rerun-fixes`:
+
+```sh
+mkdir -p batch-runs
+nohup ./batch/exploratory.sh --shards 16 >> batch-runs/exploratory.log 2>&1 &
+```
+
+`--shards` defaults to the number of cores − 1. The script takes the lock
+`batch-runs/exploratory.lock`, builds with Maven (and checks that
+`git.properties` names HEAD, not dirty), writes each arm to
+`batch-runs/exploratory/<arm>/` (with that arm's `batch-info.txt`), checks the
+number of runs and, for `EX-P`, that `paired.start.identical` is `true` in
+every pair (criteria R4; otherwise it stops), and packs
+`batch-runs/exploratory/<arm>.tgz` with `<arm>.tgz.sha256`.
+
+After an interruption, start it again: arms with a `.done` marker are not run
+again, so it resumes with the next arm. An arm that started but did not finish
+stops the script with the `mv` command that moves it aside (`run-batch.sh`
+cannot resume a batch). A leftover lock is reported; remove it only when no
+java process of the batch runs. `--reps R` and `--ngrid L` are for smoke tests
+only.
+
 ## Running on another machine
 
 Clone from `origin`, never copy a working tree: `batch-info.txt` records the
