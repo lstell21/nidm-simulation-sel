@@ -66,6 +66,11 @@
 #                     check.infected.cost.diff; see InfectedCostCheck.java).
 #                     Changes no decision. Off by default.
 #   --heap SIZE      -Xmx per shard (default 1g)
+#   --jvm-opts "OPTS" further JVM options for every shard, word-split, e.g.
+#                     "-XX:+UseSerialGC -XX:ActiveProcessorCount=1" (what
+#                     batch/slurm/final.sh passes: on a cluster node the JVM
+#                     sizes its GC and JIT thread pools from all the node's
+#                     CPUs). Recorded in batch-info.txt. None by default.
 #   --out DIR         output root (default batch-runs/<timestamp>)
 #   --jar PATH        jar to run (default target/nidm-4.0.1.jar with
 #                     target/classes, i.e. a Maven build; without that build,
@@ -110,6 +115,7 @@ GAMMA_MIN=""; GAMMA_MAX=""; ALPHA_MIN=""; ALPHA_MAX=""; SIGMA_MIN=""; SIGMA_MAX=
 ROUND_SUMMARY=""; CENTRALITIES=""; TIE_EVENTS=""; CHECK_INFECTED_COST=""
 EP_STRUCTURE=""
 HEAP="1g"
+JVM_OPTS=""
 OUT=""
 JAR=""
 DRY=0
@@ -145,6 +151,7 @@ while [ $# -gt 0 ]; do
         --check-infected-cost) CHECK_INFECTED_COST=true; shift ;;
         --ep-structure)     EP_STRUCTURE="$2"; shift 2 ;;
         --heap)             HEAP="$2"; shift 2 ;;
+        --jvm-opts)         JVM_OPTS="$2"; shift 2 ;;
         --out)              OUT="$2"; shift 2 ;;
         --jar)              JAR="$2"; shift 2 ;;
         --dry-run)          DRY=1; shift ;;
@@ -219,6 +226,7 @@ echo "  reps per N      : $REPS"
 echo "  total sims      : $(( REPS * NLEVELS ))"
 echo "  shards          : $SHARDS  (allocated by cost, ~N^$COST_EXP)"
 echo "  heap per shard  : $HEAP"
+[ -n "$JVM_OPTS" ]      && echo "  jvm options     : $JVM_OPTS"
 echo "  output          : $OUT"
 [ -n "$ZETA" ]          && echo "  zeta override   : $ZETA"
 [ -n "$OMEGA" ]         && echo "  omega fixed at  : $OMEGA"
@@ -245,12 +253,33 @@ echo
 
 mkdir -p "$OUT/work" "$OUT/split"
 
+# Provenance of the code that runs. In a git clone: git. In a bundle made by
+# batch/slurm/make-bundle.sh (git archive plus the batch jar, no .git; the
+# cluster's compute nodes may have no git at all): the bundle's
+# BUNDLE-PROVENANCE.txt, written on the build machine from a clean clone.
+PROV="$REPO/BUNDLE-PROVENANCE.txt"
+if [ ! -e "$REPO/.git" ] && [ -f "$PROV" ]; then
+    prov() { sed -n "s/^$1=//p" "$PROV" | tr -d '\r'; }
+    GIT_COMMIT=$(prov commit)
+    GIT_BRANCH=$(prov branch)
+    GIT_DIRTY=$(prov dirty)
+else
+    PROV=""
+    GIT_COMMIT=$(cd "$REPO" && git rev-parse HEAD) || true
+    GIT_BRANCH=$(cd "$REPO" && git rev-parse --abbrev-ref HEAD) || true
+    GIT_DIRTY=$(cd "$REPO" && git status --porcelain | wc -l)
+fi
+
 {
     echo "started         : $(date -Iseconds)"
-    echo "git commit      : $(cd "$REPO" && git rev-parse HEAD)"
-    echo "git branch      : $(cd "$REPO" && git rev-parse --abbrev-ref HEAD)"
-    echo "git dirty       : $(cd "$REPO" && git status --porcelain | wc -l) modified files"
+    echo "git commit      : $GIT_COMMIT"
+    echo "git branch      : $GIT_BRANCH"
+    echo "git dirty       : $GIT_DIRTY modified files"
+    if [ -n "$PROV" ]; then
+        echo "bundle          : $(prov bundle) (git lines from its BUNDLE-PROVENANCE.txt)"
+    fi
     echo "java            : $(java -version 2>&1 | head -1)"
+    echo "jvm options     : -Xmx$HEAP${JVM_OPTS:+ $JVM_OPTS}"
     echo "ngrid           : $NGRID"
     echo "reps per N      : $REPS"
     echo "shards          : $SHARDS"
@@ -269,6 +298,11 @@ mkdir -p "$OUT/work" "$OUT/split"
         JAR_GIT=$(unzip -p "$JAR" git.properties 2>/dev/null | tr -d '\r')
         JAR_COMMIT=$(printf '%s\n' "$JAR_GIT" | sed -n 's/^git\.commit\.id=//p')
         JAR_DIRTY=$(printf '%s\n' "$JAR_GIT" | sed -n 's/^git\.dirty=//p')
+        if [ -z "$JAR_COMMIT" ] && [ -n "$PROV" ]; then
+            # no unzip (cluster nodes): the bundle's record, checked when it was made
+            JAR_COMMIT=$(prov jar.git.commit.id)
+            JAR_DIRTY=$(prov jar.git.dirty)
+        fi
         echo "jar             : $JAR (batch jar)"
         echo "jar built from  : ${JAR_COMMIT:-unknown (needs unzip)}${JAR_DIRTY:+ (dirty: $JAR_DIRTY)}"
     fi
@@ -276,8 +310,15 @@ mkdir -p "$OUT/work" "$OUT/split"
 } > "$OUT/batch-info.txt"
 cp "$SRC_CONF" "$OUT/config.properties.source"
 
-CLASSESW=$(cygpath -w "$CLASSES" 2>/dev/null | tr '\\' '/' || echo "$CLASSES")
-JARW=$(cygpath -w "$JAR" 2>/dev/null | tr '\\' '/' || echo "$JAR")
+# Java on Windows needs C:/... paths; elsewhere the paths stay as they are. (The
+# earlier "cygpath -w ... | tr ... || echo ..." gave an empty path where cygpath
+# is missing: the pipeline's status is tr's, so the fallback never ran. No Linux
+# batch had been run before the cluster launcher, S9.)
+javapath() {
+    if command -v cygpath > /dev/null 2>&1; then cygpath -w "$1" | tr '\\' '/'; else printf '%s\n' "$1"; fi
+}
+CLASSESW=$(javapath "$CLASSES")
+JARW=$(javapath "$JAR")
 
 NAMES=""
 echo "$ALLOC" | while read -r N S; do
@@ -352,14 +393,15 @@ while read -r NAME N SHARD_REPS; do
     fi
     [ -n "$EP_STRUCTURE" ] && sed -i "s|^nb\.ep\.structure=.*|nb.ep.structure=$EP_STRUCTURE|" "$C"
 
-    CONFW=$(cygpath -w "$SDIR/conf" 2>/dev/null | tr '\\' '/' || echo "$SDIR/conf")
+    CONFW=$(javapath "$SDIR/conf")
 
     (
         date +%s > "$SDIR/start.epoch"
         cd "$SDIR"
         # 'if' rather than a bare call: under set -e a non-zero java exit would
         # abort the subshell before the exit code and end time were recorded.
-        if java -Xmx"$HEAP" -cp "$CONFW$CPSEP$CLASSESW$CPSEP$JARW" \
+        # $JVM_OPTS unquoted: one word per option
+        if java -Xmx"$HEAP" $JVM_OPTS -cp "$CONFW$CPSEP$CLASSESW$CPSEP$JARW" \
                 nl.uu.socnetid.nidm.mains.Generator > "$SDIR/shard.log" 2>&1
         then RC=0; else RC=$?; fi
         echo "$RC" > "$SDIR/exit.code"

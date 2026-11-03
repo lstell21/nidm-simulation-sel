@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 #
-# Live progress for a Phase 2 or Phase 3 batch driven by run-chunked.sh, or for
+# Live progress for a Phase 2 or Phase 3 batch driven by run-chunked.sh, for
 # the exploratory batch driven by exploratory.sh (its arms EX-A, EX-B, EX-P take
-# the place of the chunks).
+# the place of the chunks), or for one final batch (batch/slurm/final.sh).
 #
 # run-batch.sh prints its per-shard results only after the wait loop returns, so
 # driver.log goes quiet for the length of a chunk. The shards themselves write
 # their simulation-summary.csv incrementally, so counting rows there is the way
 # to see progress while it is happening.
 #
-# Usage:  ./batch/progress.sh [runA|runB|p3|exploratory]
+# Usage:  ./batch/progress.sh [runA|runB|p3|exploratory|final/<batch>]
+# (any folder under batch-runs/ works: a chunked run, the exploratory batch, or
+# one run-batch.sh batch such as final.sh's final/main)
 #
 # For a live view use ./batch/start.sh <arm>, which calls this every INTERVAL
 # seconds.
@@ -42,6 +44,11 @@ for c in "$ROOT"/c*/ "$ROOT"/EX-*/; do
     case "$c" in "$ROOT"/EX-*) unit="arm" ;; esac
     if [ -f "$c/.done" ]; then done_chunks=$((done_chunks + 1)); else active="${c%/}"; fi
 done
+# or a single run-batch.sh batch, e.g. final.sh's batch-runs/final/<batch>
+if [ "$done_chunks" -eq 0 ] && [ -z "$active" ] && [ -f "$ROOT/shard-list.txt" ]; then
+    unit="batch"
+    if [ -f "$ROOT/.done" ]; then done_chunks=1; else active="$ROOT"; fi
+fi
 
 # The files whose data rows we need: every staged summary (a completed arm's
 # split/ for the exploratory batch), plus the in-flight shards' own. One awk
@@ -51,6 +58,11 @@ for f in "$ROOT"/merged/*/data/nunnerbuskens/simulation-summary.csv \
          "$ROOT"/EX-*/split/*/data/nunnerbuskens/simulation-summary.csv; do
     [ -f "$f" ] && files+=("$f")
 done
+if [ "$unit" = "batch" ] && [ -z "$active" ]; then
+    for f in "$ROOT"/split/*/data/nunnerbuskens/simulation-summary.csv; do
+        [ -f "$f" ] && files+=("$f")
+    done
+fi
 if [ -n "$active" ]; then
     for f in "$active"/work/*/exports/*/data/nunnerbuskens/simulation-summary.csv; do
         [ -f "$f" ] && files+=("$f")
@@ -66,7 +78,7 @@ rows() { local _l=${lines["$1"]:-0}; printf -v "$2" '%d' $(( _l > 0 ? _l - 1 : 0
 
 staged=0
 for f in "${files[@]}"; do
-    case "$f" in "$ROOT"/merged/*|"$ROOT"/EX-*/split/*) rows "$f" r; staged=$((staged + r)) ;; esac
+    case "$f" in "$ROOT"/merged/*|"$ROOT"/EX-*/split/*|"$ROOT"/split/*) rows "$f" r; staged=$((staged + r)) ;; esac
 done
 
 echo "$ARM: $done_chunks $unit(s) complete, $staged simulations staged"

@@ -472,6 +472,186 @@ survives the whole run (`nohup`/`tmux`/`screen`) and loses everything on a
 restart. `--shards` / `SHARDS` should not exceed the number of physical cores
 (see "Why it shards").
 
+## Running on the AI-Lab cluster (`batch/slurm/`, final batches)
+
+The final re-run batches (selcor-handoff `exploratory_criteria.md`, section 6,
+fixed 1 Nov 2026; build `rerun-fixes` `490a1c7` or later) run on the
+Univ. Lübeck AI-Lab cluster: Slurm 24.05, partition `defq`, AMD EPYC 7742
+nodes. Nothing is built or run on the login node, and the compute nodes need
+neither git nor Maven, only the Java 8 runtime at
+`$HOME/opt/jdk8u502-b07-jre` (Temurin 1.8.0_502-b07, as on the laptop;
+`/home` is NFS and visible on every node). Three files:
+
+- `make-bundle.sh` (laptop) packs `git archive HEAD` without `data/`, the
+  batch jar and `BUNDLE-PROVENANCE.txt` into
+  `dist/selcor-final-<short hash>.tgz` with a `.sha256` file. The cluster runs
+  exactly this bundle. `data/` (about 4.3 GB of Git LFS data from the
+  2019–2021 projects) is left out: no batch reads it.
+- `final.sh <batch>` runs one batch through `run-batch.sh` in batch-jar mode
+  (so the shard allocation, the shard configs and the `split/` layout are the
+  exploratory batch's), checks it and packs `<batch>.tgz`.
+- `final.sbatch` is the Slurm job around `final.sh`.
+
+Every batch so far ran under Git Bash on Windows. On Linux, `run-batch.sh`
+built each shard's classpath from empty strings (its `cygpath` fallback never
+ran), so every shard would have failed at once; fixed with this launcher. In a
+bundle, `run-batch.sh` takes the git lines of `batch-info.txt` from
+`BUNDLE-PROVENANCE.txt` (there is no `.git`), and the new `--jvm-opts` passes
+JVM options to every shard.
+
+| batch | options (all: `--encounters 16 --no-centralities`) | runs | heap |
+|---|---|---|---|
+| `main` | `--omega-random --alpha-max 0.9`, N 80–480 | 10,000 per N | 1g |
+| `w0` | `--omega 0 --alpha-max 0.9` | 10,000 per N | 1g |
+| `paired` | `--omega-random --ep-structure both --gamma-min 0.1 --gamma-max 0.2 --alpha-max 0.9` | 10,000 pairs per N | 1g |
+| `tie1` | `--ngrid 240 --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 0.9 --tie-events` (the mechanism launch's M1) | 5,000 | 2g |
+| `tie2` | `--ngrid 240 --gamma-min 0.1 --gamma-max 0.4 --omega 0 --alpha-max 0.9 --tie-events` (M2) | 5,000 | 2g |
+| `exa80` | `--ngrid 80 --omega-random`: arm `EX-A`'s options, α ~ U[0, 1] | 300 | 1g |
+
+`exa80` is the cluster check against the exploratory batch: the same design
+as `EX-A` at N = 80, to be compared with its 300 runs there.
+
+**1. Bundle (laptop),** from a clean clone on `rerun-fixes`:
+
+```sh
+mvn package -DskipTests
+./batch/slurm/make-bundle.sh      # dist/selcor-final-<hash>.tgz and .tgz.sha256
+```
+
+It refuses a dirty tree (untracked files count), a jar whose `git.properties`
+does not name HEAD or says dirty, and an existing bundle of the same name.
+
+**2. Unpack (cluster),** after copying both files to `~/selcor/`:
+
+```sh
+cd ~/selcor
+sha256sum -c selcor-final-<hash>.tgz.sha256
+tar xzf selcor-final-<hash>.tgz && cd selcor-final-<hash>
+cat BUNDLE-PROVENANCE.txt
+```
+
+**3. Submit, from the bundle root.** `exa80` first and alone; then the five
+batches with `--dependency=singleton`. They share the job name
+`selcor-final`, so Slurm starts each only after the previous one has ended
+and the jobs never hold more than 64 CPUs at a time:
+
+```sh
+sbatch --cpus-per-task=16 --mem=24G --time=00:15:00 batch/slurm/final.sbatch exa80
+# look at exa80 first (below), then:
+sbatch --dependency=singleton --mem=96G  --time=4-01:00:00 batch/slurm/final.sbatch main
+sbatch --dependency=singleton --mem=96G  --time=4-08:00:00 batch/slurm/final.sbatch w0
+sbatch --dependency=singleton --mem=96G  --time=4-06:00:00 batch/slurm/final.sbatch paired
+sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie1
+sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie2
+```
+
+`--time` is the projection below times 1.5, taken at its slow end: a job
+that reaches `--time` is killed and its batch is lost, while a long `--time`
+costs nothing on a partition without a time limit. `--mem`: see "Memory".
+
+**Outputs** (default `--out <bundle>/batch-runs/final`):
+`batch-runs/final/<batch>/` (`run-batch.sh`'s layout), the hand-over files
+`batch-runs/final/<batch>.tgz` and `.tgz.sha256` (`split/`, `batch-info.txt`,
+`shard-list.txt`, `config.properties.source`; `SelSWIDM-analysis` unpacks
+the tarball into `data/rerun/<batch>/`), and the job log
+`slurm-selcor-final-<job id>.out` in the bundle root: the plan, every shard's
+rc and elapsed time, the checks. `batch-info.txt` records the commit, branch
+and dirty count from `BUNDLE-PROVENANCE.txt` (with a `bundle` line saying
+so), the jar's SHA-256, Java, the JVM options, and the Slurm job id, node and
+CPUs. `final.sh` checks the bundle (provenance file, no `.git`, the jar's
+SHA-256), Java 1.8.0_502, every shard's rc, the number of runs in `split/`,
+for `paired` that `paired.start.identical` is `true` in every pair, and for
+the tie batches that every shard wrote `tie-events.csv` and
+`transmissions.csv`. Any failure stops it with exit code 1.
+
+**Progress.** `squeue -u $USER`; `tail slurm-selcor-final-<job id>.out`
+(quiet while the shards run: `run-batch.sh` prints per shard only at the
+end); `bash batch/progress.sh final/<batch>` counts the runs written so far
+per shard and projects the end from the slowest shard. It only reads files.
+
+**After an interruption** there is no resume (`run-batch.sh` cannot). The
+next submission stops at once with the command to run first: a batch folder
+without `.done` is moved aside
+(`mv batch-runs/final/<batch> batch-runs/final/<batch>-interrupted-<date>`),
+and a left-over `batch-runs/final/<batch>.lock` is removed with `rmdir` once
+`squeue` shows no job of that batch. Then submit again. A batch with `.done`
+is not run again; only its tarball is packed if it is missing or does not
+verify. `--no-requeue` keeps Slurm from restarting a failed job by itself.
+
+**Shards and JVM.** One shard per Slurm CPU: `final.sh` takes
+`$SLURM_CPUS_PER_TASK` (64 = 32 physical cores, Slurm counts both threads of
+a core), never `nproc`, which inside a job reports all 256 CPUs of the node;
+outside Slurm it needs `--shards`. `run-batch.sh`'s cost model counts shards,
+not cores: it hands the 64 shards to the N levels in proportion to
+reps × N^3.1 (1, 1, 4, 9, 18 and 31 shards for N = 80 … 480) and assumes
+every shard runs at the same speed, so two shards on one core simply both
+run slower. Every JVM gets `-Xms` equal to `-Xmx`, `-XX:+UseSerialGC` and
+`-XX:ActiveProcessorCount=1` (`run-batch.sh --jvm-opts`). Java 8 sizes its
+thread pools from the CPUs it sees, and that is the whole node: the default
+parallel collector would start 8 + (256 − 8) × 5/8 = 163 GC threads per shard,
+and the JIT up to 36 compiler threads, thousands of threads over 64 shards
+contending for 64 CPUs at every collection. The simulation is
+single-threaded, so the serial collector (no GC threads) and a processor
+count of one (two JIT threads) fit it; `-Xms` = `-Xmx` gives every shard the
+same heap layout whatever the node's memory, which is what makes the laptop
+measurement below hold on the cluster. None of this changes a result: no
+decision depends on the collector or on thread counts. Measured on the laptop
+with these options (tie1's settings, N = 240, 4 runs, 2 November 2026): 114
+young collections paused the shard for 0.59 s in 475 s (0.1 %), with about
+8 MB live after each; at N = 480 (`main` and `paired`, 1g) 635 and 469
+collections took 0.50 and 0.44 s in total, none of them a full collection.
+The serial collector costs no measurable time.
+
+**Memory.** No exploratory run recorded memory, so it was measured on the
+laptop with the cluster's JVM options (2 November 2026). The young generation
+is a third of the fixed heap (eden 273 MB at 1g, 546 MB at 2g), touched
+within the first minute; the old generation slowly fills with what finished
+runs leave behind (about 1 MB per run at N = 240) until a full collection
+clears it, so over a long batch a shard can come to hold its whole heap.
+Outside the heap a shard needed less than 0.1 GB. Peak working sets: 371 MB
+(`main`'s options, N = 480, 1g), 374 MB (`paired`, N = 480, 1g), 645 MB
+(`tie1`, N = 240, 2g, 4 runs), each about 300 or 590 MB of touched heap plus
+the JVM itself. Hence 1.5 GB per 1g shard (1.1 GB at most, plus a margin)
+and 2.5 GB per 2g shard of the tie batches (2.1 GB at most): `--mem=96G` for
+64 shards, `160G` for the tie batches, `24G` for `exa80`'s 16. The tie batches keep the
+mechanism launch's `--heap 2g`; they would fit in 1g (8 MB live), which would
+halve their `--mem` if a node cannot give 160G.
+
+**Projections** (alpha ~ U[0, 0.9]). From the exploratory batch's shard-seconds
+per run on leost (7 shards; `exploratory_diagnostics.md`, R6: N = 80 … 480
+take 1.6, 10.1, 36, 91, 185, 346 s in `EX-A`), scaled up by the rounds a run
+lasts at α ≤ 0.9 against α ≤ 1 (+1.4 % to +3.8 % by N and arm: the runs above
+0.9 are short, their networks fall apart; taken in full, an upper bound), and
+placed on 64 shards with `run-batch.sh`'s own allocation. *f* is a cluster
+CPU's time per run over a leost shard's; it is not known before `exa80`.
+
+| batch | leost core-hours | wall, 64 shards, f = 1 | f = 2 | `--time` (f = 2 × 1.5) | `.tgz` | on disk |
+|---|---|---|---|---|---|---|
+| `main` | 1,921 | 32 h | 64 h | 97 h | ~120 MB | ~1.6 GB |
+| `w0` | 2,004 | 34 h | 69 h | 104 h | ~120 MB | ~1.5 GB |
+| `paired` | 1,974 | 34 h | 68 h | 102 h | ~150 MB | ~2.8 GB |
+| `tie1` | 51 | 0.8 h | 1.6 h | 3 h | ~100 MB | ~1.2 GB |
+| `tie2` | 47 | 0.7 h | 1.5 h | 3 h | ~110 MB | ~1.3 GB |
+| `exa80` | 0.1 | 1 min | 2 min | 15 min (16 CPUs) | < 1 MB | |
+
+Five batches: about 6,000 leost core-hours (5,836 at α ~ U[0, 1]), about 4.2
+days one after the other at f = 1 and 8.5 days at f = 2. The slowest shard
+is one at N = 480 (31 shards of 322–323 runs); the mean shard needs 7 % less.
+On leost's figures `--cost-exp 3.3` would save about 1 h (3 %) per large
+batch; `final.sh` keeps `run-batch.sh`'s 3.1, as the exploratory batch did,
+since a cluster CPU need not scale with N as leost's did. Output
+sizes are scaled from the exploratory archives (`main`, `w0`, `paired`) and
+from M1 and M2 (`tie1`, `tie2`); "on disk" counts `work/` and `split/`,
+about twice the data.
+
+**Calibrating with `exa80`.** Its log lists every shard's elapsed time;
+`EX-A` took 1.6 shard-seconds per run at N = 80 on leost, so
+f = (mean elapsed ÷ runs per shard) ÷ 1.6 s. The `--time` values above hold
+for f up to 3 (they assume f = 2 with a margin of 1.5); for a larger f, set
+`--time` to at least 1.5 × f × the f = 1 wall time before submitting.
+`exa80`'s runs themselves (300 at N = 80, the `EX-A` design) are for the
+comparison with `EX-A`'s 300 runs at N = 80.
+
 ## Published configuration
 
 Recovered from `40_simulation.tex` Table 1 unless noted. Independently confirmed
