@@ -147,6 +147,8 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         // corrections of the code checks S10, in every run (false: the code as before S11)
         cols.add(LogValues.IV_NB_FIX_ORDER.toString());
         cols.add(LogValues.IV_NB_FIX_D2.toString());
+        // rounds after the outbreak (S11b; nb.zeta when the key is absent)
+        cols.add(LogValues.IV_NB_ZETA_POST.toString());
 
         writeLine(cols);
     }
@@ -278,6 +280,7 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         // corrections of the code checks S10
         currData.add(String.valueOf(PropertiesHandler.getInstance().isFixOrder()));
         currData.add(String.valueOf(PropertiesHandler.getInstance().isFixD2()));
+        currData.add(String.valueOf(this.dgData.getUtilityModelParams().getZetaPost()));
 
         writeLine(currData);
     }

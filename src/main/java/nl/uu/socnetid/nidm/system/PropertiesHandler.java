@@ -457,6 +457,11 @@ public class PropertiesHandler {
         nbParameters.setSelectives(parseBooleanArray(configProps.getProperty(LogValues.IV_NB_SELECTIVE.toString())));
         // time steps
         nbParameters.setZeta(Integer.valueOf(configProps.getProperty(LogValues.IV_NB_ZETA.toString())));
+        // rounds after an outbreak (S11b); absent: as nb.zeta, so existing configs run as before
+        String zetaPost = configProps.getProperty(LogValues.IV_NB_ZETA_POST.toString());
+        if (zetaPost != null && !zetaPost.trim().isEmpty()) {
+            nbParameters.setZetaPost(Integer.valueOf(zetaPost.trim()));
+        }
         nbParameters.setEpsilon(Integer.valueOf(configProps.getProperty(LogValues.IV_NB_EPSILON.toString())));
         nbParameters.setTaus(parseIntArray(configProps.getProperty(LogValues.IV_NB_TAU.toString())));
         // n

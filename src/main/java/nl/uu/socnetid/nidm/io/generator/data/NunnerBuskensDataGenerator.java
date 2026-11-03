@@ -572,8 +572,8 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
         this.simulation = new Simulation(network, isEpStatic);
         this.simulation.addSimulationListener(this);
 
-        // simulate
-        this.simulation.simulateUntilStable(this.dgData.getUtilityModelParams().getZeta());
+        // simulate: nb.zeta.post rounds (S11b; as nb.zeta when the key is absent)
+        this.simulation.simulateUntilStable(this.dgData.getUtilityModelParams().getZetaPost());
     }
 
     /**

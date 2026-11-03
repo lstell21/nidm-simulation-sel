@@ -244,6 +244,7 @@ public enum LogValues {
     IV_NB_SELECTIVE_RANDOM("nb.selective.random"),
     IV_NB_SELECTIVE("nb.selective"),
     IV_NB_ZETA("nb.zeta"),
+    IV_NB_ZETA_POST("nb.zeta.post"),
     IV_NB_EPSILON("nb.epsilon"),
     IV_NB_SIMS_PER_PC("nb.n"),
     IV_NB_SIM_ITERATIONS("nb.m"),

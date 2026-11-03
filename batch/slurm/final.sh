@@ -16,7 +16,8 @@
 #   tie2    N = 240, 5,000 runs, tie events, gamma ~ U[0.1, 0.4], omega = 0, heap 2g (M2)
 #   These five: alpha ~ U[0, 0.9] (--alpha-max 0.9), 16 encounters, no centralities, random
 #   agent order and each second-degree neighbour once (--fix-order --fix-d2; decided 3 Nov),
-#   zeta from --zeta Z (default 10; set after the robustness batch, rule B).
+#   burn-in zeta from --zeta Z (default 10; set after the robustness batch, rule B), 10 rounds
+#   after each outbreak (--zeta-post 10, S11b).
 #   exa80   cluster check against the exploratory batch: exactly arm EX-A's options
 #           (exploratory.sh: --encounters 16 --no-centralities --omega-random; alpha ~ U[0, 1],
 #           not 0.9; switches off, zeta 10), N = 80 only, 300 runs.
@@ -25,7 +26,7 @@
 #           --alpha-max 0.9):
 #             arm A  switches off (as 3e4e86d), zeta 10
 #             arm B  --fix-order --fix-d2, zeta 10
-#             arm C  --fix-order --fix-d2, zeta 30
+#             arm C  --fix-order --fix-d2, zeta 30 (burn-in), 10 rounds after the outbreak
 #           at N = 80 (20,000 runs per arm), 240 (5,000) and 480 (1,000). Cell order: N = 80
 #           A, B, C, then N = 240 A, B, C, then N = 480 A, B, C (all arms of the cheapest N
 #           first). --runs-factor F (0 < F <= 1) multiplies every cell's runs alike;
@@ -89,15 +90,15 @@ ZETA=${ZETA_OPT:-10}
 case "$ZETA" in ''|*[!0-9]*) die "zeta must be a number, not '$ZETA'" ;; esac
 case "$BATCH" in
     main)   REPS=10000; NGRID=""; HEAP=1g; DESC="main design, alpha ~ U[0, 0.9]"
-            set -- --omega-random --alpha-max 0.9 $FIXES --zeta "$ZETA" ;;
+            set -- --omega-random --alpha-max 0.9 $FIXES --zeta "$ZETA" --zeta-post 10 ;;
     w0)     REPS=10000; NGRID=""; HEAP=1g; DESC="omega = 0, alpha ~ U[0, 0.9]"
-            set -- --omega 0 --alpha-max 0.9 $FIXES --zeta "$ZETA" ;;
+            set -- --omega 0 --alpha-max 0.9 $FIXES --zeta "$ZETA" --zeta-post 10 ;;
     paired) REPS=10000; NGRID=""; HEAP=1g; DESC="paired (ep-structure both), gamma ~ U[0.1, 0.2], alpha ~ U[0, 0.9]"
-            set -- --omega-random --ep-structure both --gamma-min 0.1 --gamma-max 0.2 --alpha-max 0.9 $FIXES --zeta "$ZETA" ;;
+            set -- --omega-random --ep-structure both --gamma-min 0.1 --gamma-max 0.2 --alpha-max 0.9 $FIXES --zeta "$ZETA" --zeta-post 10 ;;
     tie1)   REPS=5000; NGRID=240; HEAP=2g; DESC="tie events, gamma ~ U[0.1, 0.2], omega random, alpha ~ U[0, 0.9] (M1 options)"
-            set -- --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 0.9 --tie-events $FIXES --zeta "$ZETA" ;;
+            set -- --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 0.9 --tie-events $FIXES --zeta "$ZETA" --zeta-post 10 ;;
     tie2)   REPS=5000; NGRID=240; HEAP=2g; DESC="tie events, gamma ~ U[0.1, 0.4], omega = 0, alpha ~ U[0, 0.9] (M2 options)"
-            set -- --gamma-min 0.1 --gamma-max 0.4 --omega 0 --alpha-max 0.9 --tie-events $FIXES --zeta "$ZETA" ;;
+            set -- --gamma-min 0.1 --gamma-max 0.4 --omega 0 --alpha-max 0.9 --tie-events $FIXES --zeta "$ZETA" --zeta-post 10 ;;
     exa80)  REPS=300; NGRID=80; HEAP=1g; DESC="cluster check: exploratory arm EX-A's options at N = 80 (alpha ~ U[0, 1])"
             [ -z "$ZETA_OPT" ] || die "exa80 is EX-A's design: no --zeta"
             set -- --omega-random ;;
@@ -202,7 +203,7 @@ robust_cells() {
         fi
         echo "A $N $R 10"
         echo "B $N $R 10 $FIXES"
-        echo "C $N $R 30 $FIXES"
+        echo "C $N $R 30 $FIXES --zeta-post 10"
     done
 }
 
@@ -298,7 +299,7 @@ if [ "$BATCH" = "robust" ]; then
         case "$ARM" in
             A) ADESC="switches off (order and second-degree draw as 3e4e86d), zeta 10" ;;
             B) ADESC="random agent order, each second-degree neighbour once, zeta 10" ;;
-            C) ADESC="random agent order, each second-degree neighbour once, zeta 30" ;;
+            C) ADESC="random agent order, each second-degree neighbour once, zeta 30 (burn-in), zeta.post 10" ;;
         esac
         run_cell "$ARM-n$N" "$OUT/$ARM-n$N" "$R" "$N" \
             "robust cell     : $ARM-n$N -- arm $ARM: $ADESC (robustness_criteria.md, section 3)" \

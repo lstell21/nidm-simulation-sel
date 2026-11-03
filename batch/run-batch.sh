@@ -28,7 +28,9 @@
 #   --shards K        total parallel JVM processes (default 8); must be >= number
 #                     of N levels, since every level needs at least one shard
 #   --ngrid "a,b,c"   N grid (default "80,160,240,320,400,480")
-#   --zeta Z          override nb.zeta
+#   --zeta Z          override nb.zeta: the burn-in, in rounds
+#   --zeta-post P     set nb.zeta.post: the rounds after each outbreak (S11b;
+#                     without it, as zeta)
 #   --omega V         fix nb.omega to V and set nb.omega.random=false
 #   --omega-random    force nb.omega.random=true
 #   --encounters K    hold encounters per agent constant at K by setting
@@ -108,7 +110,7 @@ esac
 NGRID="80,160,240,320,400,480"
 REPS=5000
 SHARDS=8
-ZETA=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
+ZETA=""; ZETA_POST=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
 # nb.phi is a PROPORTION of N-1, not a count: Agent.getNumberOfNetworkDecisions()
 # computes round((nodeCount - 1) * phi). Table 1 of the manuscript specifies
 # phi = 16 encounters per agent per time step, "kept constant" across N, which a
@@ -141,6 +143,7 @@ while [ $# -gt 0 ]; do
         --shards)           SHARDS="$2"; shift 2 ;;
         --ngrid)            NGRID="$2"; shift 2 ;;
         --zeta)             ZETA="$2"; shift 2 ;;
+        --zeta-post)        ZETA_POST="$2"; shift 2 ;;
         --omega)            OMEGA="$2"; shift 2 ;;
         --omega-random)     OMEGA_RANDOM=1; shift ;;
         --sigma-random)     SIGMA_RANDOM=1; shift ;;
@@ -239,6 +242,7 @@ echo "  heap per shard  : $HEAP"
 [ -n "$JVM_OPTS" ]      && echo "  jvm options     : $JVM_OPTS"
 echo "  output          : $OUT"
 [ -n "$ZETA" ]          && echo "  zeta override   : $ZETA"
+[ -n "$ZETA_POST" ]     && echo "  zeta post       : $ZETA_POST rounds after each outbreak"
 [ -n "$OMEGA" ]         && echo "  omega fixed at  : $OMEGA"
 [ -n "$OMEGA_RANDOM" ]  && echo "  omega           : random"
 [ -n "$GAMMA_MIN$GAMMA_MAX" ] && echo "  gamma range     : ${GAMMA_MIN:-config}..${GAMMA_MAX:-config}"
@@ -304,6 +308,7 @@ fi
     echo "tie events      : ${TIE_EVENTS:-config (false)}"
     echo "shadow check    : check.infected.cost=${CHECK_INFECTED_COST:-config (false)}"
     echo "zeta            : ${ZETA:-config ($(sed -n 's/^nb\.zeta=//p' "$SRC_CONF" | tr -d '\r'))}"
+    echo "zeta post       : ${ZETA_POST:-config ($(sed -n 's/^nb\.zeta\.post=//p' "$SRC_CONF" | tr -d '\r' | grep . || echo "absent: as zeta"))}"
     echo "fix order       : nb.fix.order=${FIX_ORDER:-config (false)}"
     echo "fix d2          : nb.fix.d2=${FIX_D2:-config (false)}"
     echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
@@ -376,6 +381,14 @@ while read -r NAME N SHARD_REPS; do
                -e "/^#[[:space:]]*nb\.phi=/d" "$C"
     fi
     [ -n "$ZETA" ] && sed -i "s|^nb\.zeta=.*|nb.zeta=$ZETA|" "$C"
+    if [ -n "$ZETA_POST" ]; then
+        # the committed config has the key only as a comment (absent = as zeta)
+        if grep -q '^nb\.zeta\.post=' "$C"; then
+            sed -i "s|^nb\.zeta\.post=.*|nb.zeta.post=$ZETA_POST|" "$C"
+        else
+            echo "nb.zeta.post=$ZETA_POST" >> "$C"
+        fi
+    fi
     if [ -n "$OMEGA" ]; then
         sed -i -e "s|^nb\.omega\.random=.*|nb.omega.random=false|" \
                -e "s|^nb\.omega=.*|nb.omega=$OMEGA|" "$C"
