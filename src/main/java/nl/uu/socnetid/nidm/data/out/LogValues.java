@@ -577,6 +577,9 @@ public enum LogValues {
     DV_CHECK_INFECTED_COST_DIFF("check.infected.cost.diff"),
     // paired design (nb.ep.structure=both only): both arms started from the same edge list
     DV_PAIRED_START_IDENTICAL("paired.start.identical"),
+    // corrections of the code checks S10 (every run; false: the code as before S11)
+    IV_NB_FIX_ORDER("nb.fix.order"),
+    IV_NB_FIX_D2("nb.fix.d2"),
 
     // OTHERS
     EXPORT_FILENAME("export.filename"),

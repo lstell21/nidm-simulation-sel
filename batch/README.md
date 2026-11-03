@@ -507,9 +507,37 @@ JVM options to every shard.
 | `tie1` | `--ngrid 240 --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 0.9 --tie-events` (the mechanism launch's M1) | 5,000 | 2g |
 | `tie2` | `--ngrid 240 --gamma-min 0.1 --gamma-max 0.4 --omega 0 --alpha-max 0.9 --tie-events` (M2) | 5,000 | 2g |
 | `exa80` | `--ngrid 80 --omega-random`: arm `EX-A`'s options, α ~ U[0, 1] | 300 | 1g |
+| `robust` | nine cells, see below | 20,000 / 5,000 / 1,000 per arm at N = 80 / 240 / 480 | 1g |
 
 `exa80` is the cluster check against the exploratory batch: the same design
 as `EX-A` at N = 80, to be compared with its 300 runs there.
+
+**Switches (S11, 3 Nov 2026).** The five final batches always run with
+`--fix-order --fix-d2` (decided 3 Nov, `robustness_criteria.md` D1 and D2;
+see "Known divergences") and with `--zeta Z` from `final.sh --zeta Z`
+(default 10; set after the robustness batch by its rule B). `exa80` keeps
+`EX-A`'s design: switches off, zeta 10. `batch-info.txt` records `zeta`,
+`fix order` and `fix d2`; `simulation-summary.csv` ends with `nb.fix.order`
+and `nb.fix.d2` in every run.
+
+**`robust`** (`robustness_criteria.md`, approved 3 Nov 2026): one job runs
+nine cells one after another, each a `run-batch.sh` batch at one N with the
+main batch's options (`--encounters 16 --no-centralities --omega-random
+--alpha-max 0.9`): arm A switches off, zeta 10; arm B `--fix-order
+--fix-d2`, zeta 10; arm C `--fix-order --fix-d2`, zeta 30. Order: N = 80 A,
+B, C, then N = 240 A, B, C, then N = 480 A, B, C (every arm of the cheapest N
+first). Cells land in `batch-runs/final/robust/<arm>-n<N>/`, and
+`robust.tgz` holds the four hand-over files of every cell under
+`<arm>-n<N>/`. A completed cell (`.done`) is skipped when the job is
+submitted again, so a resubmission continues with the next cell; a cell
+interrupted half-way stops the job with the `mv` command that moves it aside.
+`--runs-factor F` (0 < F ≤ 1) cuts every cell's runs alike.
+
+zeta sets both the burn-in and the post-outbreak stage
+(`NunnerBuskensDataGenerator.simulatePreEpidemic()` and
+`simulatePostEpidemic()` both call `simulateUntilStable(zeta)`; the
+exploratory runs have exactly 10 rounds in each), so zeta = 30 adds 40 rounds
+to every run, not 20, and about doubles its cost.
 
 **1. Bundle (laptop),** from a clean clone on `rerun-fixes`:
 
@@ -537,17 +565,22 @@ and the jobs never hold more than 64 CPUs at a time:
 
 ```sh
 sbatch --cpus-per-task=16 --mem=24G --time=00:15:00 batch/slurm/final.sbatch exa80
-# look at exa80 first (below), then:
-sbatch --dependency=singleton --mem=96G  --time=4-01:00:00 batch/slurm/final.sbatch main
-sbatch --dependency=singleton --mem=96G  --time=4-08:00:00 batch/slurm/final.sbatch w0
-sbatch --dependency=singleton --mem=96G  --time=4-06:00:00 batch/slurm/final.sbatch paired
-sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie1
-sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie2
+# the robustness batch (S11; design runs at 64 CPUs, about 13 h, see "Projections"):
+sbatch --mem=96G --time=20:00:00 batch/slurm/final.sbatch robust
+# after rule B has set zeta (Z = 10 or 30), the five final batches:
+sbatch --dependency=singleton --mem=96G  --time=3-00:00:00 batch/slurm/final.sbatch main   --zeta Z
+sbatch --dependency=singleton --mem=96G  --time=3-00:00:00 batch/slurm/final.sbatch w0     --zeta Z
+sbatch --dependency=singleton --mem=96G  --time=3-00:00:00 batch/slurm/final.sbatch paired --zeta Z
+sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie1   --zeta Z
+sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie2   --zeta Z
+# with Z = 30: --time=5-12:00:00 for main and w0, 4-00:00:00 for paired, 04:00:00 for tie1, tie2
 ```
 
-`--time` is the projection below times 1.5, taken at its slow end: a job
-that reaches `--time` is killed and its batch is lost, while a long `--time`
-costs nothing on a partition without a time limit. `--mem`: see "Memory".
+`--time` is the projection below times 1.5 (rounded up): a job that reaches
+`--time` is killed and its batch is lost, while a long `--time` costs nothing
+on a partition without a time limit. `--mem`: see "Memory". `robust` runs at
+`--cpus-per-task` 64 unless given otherwise; with 128 CPUs it takes half as
+long.
 
 **Outputs** (default `--out <bundle>/batch-runs/final`):
 `batch-runs/final/<batch>/` (`run-batch.sh`'s layout), the hand-over files
@@ -651,6 +684,23 @@ for f up to 3 (they assume f = 2 with a margin of 1.5); for a larger f, set
 `--time` to at least 1.5 × f × the f = 1 wall time before submitting.
 `exa80`'s runs themselves (300 at N = 80, the `EX-A` design) are for the
 comparison with `EX-A`'s 300 runs at N = 80.
+
+**Measured (3 Nov 2026): f = 1.25** (exa80: 2.0 s per run at N = 80). At that
+speed, with rounds per run from the exploratory round summaries (zeta = 30
+adds 40 per run):
+
+| batch, 64 CPUs | zeta 10: wall / CPU-hours | zeta 30: wall / CPU-hours |
+|---|---|---|
+| `main` | 40 h / 2,400 | 79 h / 4,740 |
+| `w0` | 43 h / 2,510 | 85 h / 4,950 |
+| `paired` | 42 h / 2,470 | 64 h / 3,780 |
+| `tie1`, `tie2` | 1.0 h, 0.9 h | 2.0 h, 1.9 h |
+| all five, one after another | 5.3 days | 9.6 days |
+
+`robust` as designed: 12.7 h at 64 CPUs (arm C, zeta 30, is half of it; the
+three N = 480 cells 61 %): N = 80 cells 0.2 / 0.2 / 0.4 h (A / B / C), N = 240
+1.0 / 1.0 / 2.0 h, N = 480 2.0 / 2.0 / 3.9 h. 6.4 h at 128 CPUs, 4.6 h at
+192, 3.2 h at 256; at 64 CPUs `--runs-factor 0.5` gives 6.4 h, `0.35` 4.7 h.
 
 ## Published configuration
 
@@ -901,6 +951,26 @@ generated without them.
 - **`Agent.java` line 1123 (now 1135) duplicates a condition.** The test reads
   `(randPsi > psi+xi) && (randPsi > psi+xi)`; the second conjunct repeats the
   first. Harmless — it evaluates identically to the single condition.
+- **Code checks S10 (branch `code-checks`, 3 Nov 2026), three findings; all
+  three are identical in `origin/master`.**
+  - *Second-degree draw.* `Agent.getConnectionsAtDistance2()` lists a
+    friend of a friend once per shared friend, so the shuffled branch of
+    `computeRound` draws it in proportion to the shared friends (3–5 times as
+    likely for the most favoured; the sorted branch is not affected). Done:
+    switch `nb.fix.d2` (`run-batch.sh --fix-d2`), on in every final batch:
+    each one is a candidate once.
+  - *Agent order.* `Simulation.computeAgentDynamics()` shuffles the agents and
+    then takes them from `HashSet`s, which iterate by identity hash, so the
+    order is nearly the same in every round of a run (and repeats across
+    JVMs). Done: switch `nb.fix.order` (`--fix-order`), on in every final
+    batch: the next agent is drawn at random from the waiting contacts of
+    processed agents, or, if none wait, from all agents not yet processed.
+  - *Burn-in.* The stability check is switched off (`Network.java`, "XXX
+    STABILITY COMPUTATION TURNED OFF"), so the burn-in is always exactly zeta
+    = 10 steps and no network is pairwise stable after it. Done: zeta of the
+    final batches is set by the robustness batch (`robust`, rule B of
+    `robustness_criteria.md`: 10 or 30); stability is still not tested.
+  Every batch up to S11 ran with both switches off (as `3e4e86d`).
 
 ## Open
 

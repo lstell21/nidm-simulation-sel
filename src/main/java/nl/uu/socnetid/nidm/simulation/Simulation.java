@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -363,6 +364,10 @@ public class Simulation implements Runnable {
         Set<Agent> agentsAll = new HashSet<Agent>(agents);
         Set<Agent> agentsToProcess = new HashSet<Agent>(this.network.getN());
         Set<String> agentsProcessed = new HashSet<String>(this.network.getN());
+        // nb.fix.order (S10 item 2, S11). Off: the next agent is the first in the HashSets' iteration
+        // order, i.e. by identity hash, so the shuffle above has almost no effect and the order is
+        // nearly the same in every round (as up to S11). On: drawn uniformly at random.
+        boolean randomOrder = this.network.isFixOrder();
 
         while (!agentsAll.isEmpty()) {
 
@@ -374,11 +379,11 @@ public class Simulation implements Runnable {
             // randomly select an unconnected and unprocessed agent
             // if no connected agents (left) to process
             if (agentsToProcess.isEmpty()) {
-                agentsToProcess.add(agentsAll.iterator().next());
+                agentsToProcess.add(randomOrder ? randomAgent(agentsAll) : agentsAll.iterator().next());
             }
 
             // PROCESS AGENT
-            Agent agent = agentsToProcess.iterator().next();
+            Agent agent = randomOrder ? randomAgent(agentsToProcess) : agentsToProcess.iterator().next();
             computeAgentRound(agent, this.delay);
             // list updates
             agentsProcessed.add(agent.getId());
@@ -397,6 +402,23 @@ public class Simulation implements Runnable {
                 }
             }
         }
+    }
+
+    /**
+     * Draws an agent uniformly at random from a set (nb.fix.order). ThreadLocalRandom, as the
+     * agents' own decisions (Agent.computeRound) and the generator's parameter draws.
+     *
+     * @param agents
+     *          the agents to draw from, not empty
+     * @return the drawn agent
+     */
+    private static Agent randomAgent(Set<Agent> agents) {
+        int k = ThreadLocalRandom.current().nextInt(agents.size());
+        Iterator<Agent> it = agents.iterator();
+        for (int i = 0; i < k; i++) {
+            it.next();
+        }
+        return it.next();
     }
 
     /**

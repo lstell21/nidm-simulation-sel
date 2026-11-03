@@ -442,6 +442,9 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
                 this.infectedCostCheck.reset();
                 this.network.setInfectedCostCheck(this.infectedCostCheck);
             }
+            // corrections of the code checks S10 (nb.fix.order, nb.fix.d2; off: the code as before)
+            this.network.setFixOrder(PropertiesHandler.getInstance().isFixOrder());
+            this.network.setFixD2(PropertiesHandler.getInstance().isFixD2());
 
             // begin: GEXF export
             if (PropertiesHandler.getInstance().isExportGexf()) {

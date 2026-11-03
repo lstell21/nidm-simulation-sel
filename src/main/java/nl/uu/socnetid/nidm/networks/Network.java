@@ -96,6 +96,9 @@ public class Network extends SingleGraph implements SimulationListener {
     private TieEventLog tieEventLog = null;
     // shadow check of the infected agents' disease cost (check.infected.cost); null when off
     private InfectedCostCheck infectedCostCheck = null;
+    // corrections of the code checks S10 (nb.fix.order, nb.fix.d2); false: the code as before
+    private boolean fixOrder = false;
+    private boolean fixD2 = false;
 
 
     /**
@@ -495,6 +498,46 @@ public class Network extends SingleGraph implements SimulationListener {
      */
     public void setInfectedCostCheck(InfectedCostCheck infectedCostCheck) {
         this.infectedCostCheck = infectedCostCheck;
+    }
+
+    /**
+     * Whether agents act in a random order in every round (nb.fix.order): see
+     * Simulation.computeAgentDynamics().
+     *
+     * @return true if the order is drawn at random
+     */
+    public boolean isFixOrder() {
+        return this.fixOrder;
+    }
+
+    /**
+     * Sets whether agents act in a random order in every round (nb.fix.order).
+     *
+     * @param fixOrder
+     *          true for a random order
+     */
+    public void setFixOrder(boolean fixOrder) {
+        this.fixOrder = fixOrder;
+    }
+
+    /**
+     * Whether each second-degree neighbour is a candidate once, not once per shared neighbour
+     * (nb.fix.d2): see Agent.computeRound().
+     *
+     * @return true if each second-degree neighbour is a candidate once
+     */
+    public boolean isFixD2() {
+        return this.fixD2;
+    }
+
+    /**
+     * Sets whether each second-degree neighbour is a candidate once (nb.fix.d2).
+     *
+     * @param fixD2
+     *          true for once
+     */
+    public void setFixD2(boolean fixD2) {
+        this.fixD2 = fixD2;
     }
 
     /**

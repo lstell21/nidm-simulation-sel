@@ -144,6 +144,9 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         if (this.dgData.getUtilityModelParams().getEpStructure() == EpidemicStructures.BOTH) {
             cols.add(LogValues.DV_PAIRED_START_IDENTICAL.toString());
         }
+        // corrections of the code checks S10, in every run (false: the code as before S11)
+        cols.add(LogValues.IV_NB_FIX_ORDER.toString());
+        cols.add(LogValues.IV_NB_FIX_D2.toString());
 
         writeLine(cols);
     }
@@ -272,6 +275,9 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         if (this.dgData.getUtilityModelParams().getEpStructure() == EpidemicStructures.BOTH) {
             currData.add(String.valueOf(this.dgData.getSimStats().isPairedStartIdentical()));
         }
+        // corrections of the code checks S10
+        currData.add(String.valueOf(PropertiesHandler.getInstance().isFixOrder()));
+        currData.add(String.valueOf(PropertiesHandler.getInstance().isFixD2()));
 
         writeLine(currData);
     }

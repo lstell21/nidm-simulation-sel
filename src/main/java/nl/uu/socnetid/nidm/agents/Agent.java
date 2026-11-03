@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -596,6 +597,23 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
     }
 
     /**
+     * The second-degree candidates of computeRound. getConnectionsAtDistance2() lists a
+     * second-degree neighbour once per shared neighbour, so in the shuffled branch the draw is
+     * weighted by shared neighbours (code checks S10, item 1). With nb.fix.d2 on, each one is
+     * listed once (first occurrence kept); the sorted branch draws the same agents as with the
+     * repeats, which only sat next to each other. Off: the list as it is (as up to S11).
+     *
+     * @return the agent's second-degree candidates
+     */
+    private List<Agent> getCandidatesAtDistance2() {
+        List<Agent> connectionsDist2 = this.getConnectionsAtDistance2();
+        if (this.getNetwork().isFixD2()) {
+            return new ArrayList<Agent>(new LinkedHashSet<Agent>(connectionsDist2));
+        }
+        return connectionsDist2;
+    }
+
+    /**
      * Gets the agent's co-agents.
      *
      * @return the agent's co-agents
@@ -1061,10 +1079,10 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         List<Agent> distance1AgentsShuffled = new ArrayList<Agent>(this.getConnections());
         Collections.shuffle(distance1AgentsShuffled);
        
-        // distance 2
-        List<Agent> distance2AgentsAssorted = new ArrayList<Agent>(this.getConnectionsAtDistance2());
+        // distance 2 (nb.fix.d2: see getCandidatesAtDistance2)
+        List<Agent> distance2AgentsAssorted = new ArrayList<Agent>(this.getCandidatesAtDistance2());
         sortByAssortativityConditions(distance2AgentsAssorted, true);									// most similar first --> if creating a tie, consider most similar first
-        List<Agent> distance2AgentsShuffled = new ArrayList<Agent>(this.getConnectionsAtDistance2());
+        List<Agent> distance2AgentsShuffled = new ArrayList<Agent>(this.getCandidatesAtDistance2());
         Collections.shuffle(distance2AgentsShuffled);
         
         // all other agents

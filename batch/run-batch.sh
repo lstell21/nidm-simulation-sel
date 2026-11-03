@@ -65,6 +65,13 @@
 #                     counted in simulation-summary.csv (check.infected.cost.n,
 #                     check.infected.cost.diff; see InfectedCostCheck.java).
 #                     Changes no decision. Off by default.
+#   --fix-order       set nb.fix.order=true: agents act in a random order in
+#                     every round (code checks S10 item 2; off: by identity
+#                     hash, nearly the same order every round). Off by default.
+#   --fix-d2          set nb.fix.d2=true: each second-degree neighbour is a
+#                     candidate once (S10 item 1; off: once per shared
+#                     neighbour). Off by default. Both are written to
+#                     simulation-summary.csv (nb.fix.order, nb.fix.d2).
 #   --heap SIZE      -Xmx per shard (default 1g)
 #   --jvm-opts "OPTS" further JVM options for every shard, word-split, e.g.
 #                     "-XX:+UseSerialGC -XX:ActiveProcessorCount=1" (what
@@ -113,6 +120,7 @@ ZETA=""; OMEGA=""; OMEGA_RANDOM=""; SIGMA_RANDOM=""
 ENCOUNTERS=16; PHI=""
 GAMMA_MIN=""; GAMMA_MAX=""; ALPHA_MIN=""; ALPHA_MAX=""; SIGMA_MIN=""; SIGMA_MAX=""
 ROUND_SUMMARY=""; CENTRALITIES=""; TIE_EVENTS=""; CHECK_INFECTED_COST=""
+FIX_ORDER=""; FIX_D2=""
 EP_STRUCTURE=""
 HEAP="1g"
 JVM_OPTS=""
@@ -149,6 +157,8 @@ while [ $# -gt 0 ]; do
         --no-centralities)  CENTRALITIES=false; shift ;;
         --tie-events)       TIE_EVENTS=true; shift ;;
         --check-infected-cost) CHECK_INFECTED_COST=true; shift ;;
+        --fix-order)        FIX_ORDER=true; shift ;;
+        --fix-d2)           FIX_D2=true; shift ;;
         --ep-structure)     EP_STRUCTURE="$2"; shift 2 ;;
         --heap)             HEAP="$2"; shift 2 ;;
         --jvm-opts)         JVM_OPTS="$2"; shift 2 ;;
@@ -238,6 +248,8 @@ echo "  output          : $OUT"
 [ -n "$CENTRALITIES" ]  && echo "  centralities    : $CENTRALITIES"
 [ -n "$TIE_EVENTS" ]    && echo "  tie events      : on (tie-events.csv, transmissions.csv)"
 [ -n "$CHECK_INFECTED_COST" ] && echo "  shadow check    : check.infected.cost=true (infected cost sigma vs d * sigma)"
+[ -n "$FIX_ORDER" ]     && echo "  fix order       : nb.fix.order=true (random agent order every round)"
+[ -n "$FIX_D2" ]        && echo "  fix d2          : nb.fix.d2=true (each second-degree neighbour once)"
 [ -n "$SIGMA_RANDOM" ]  && echo "  sigma           : random"
 [ -n "$ROUND_SUMMARY" ] && echo "  round summary   : $ROUND_SUMMARY"
 [ -n "$EP_STRUCTURE" ] && echo "  ep structure    : $EP_STRUCTURE"
@@ -291,6 +303,9 @@ fi
     echo "centralities    : ${CENTRALITIES:-config (true)}"
     echo "tie events      : ${TIE_EVENTS:-config (false)}"
     echo "shadow check    : check.infected.cost=${CHECK_INFECTED_COST:-config (false)}"
+    echo "zeta            : ${ZETA:-config ($(sed -n 's/^nb\.zeta=//p' "$SRC_CONF" | tr -d '\r'))}"
+    echo "fix order       : nb.fix.order=${FIX_ORDER:-config (false)}"
+    echo "fix d2          : nb.fix.d2=${FIX_D2:-config (false)}"
     echo "platform        : $(uname -s 2>/dev/null) (classpath separator '$CPSEP')"
     if [ -n "$BATCH_MODE" ]; then
         # "git commit" above is this clone's; the classes that run are the jar's,
@@ -391,6 +406,15 @@ while read -r NAME N SHARD_REPS; do
             echo "check.infected.cost=$CHECK_INFECTED_COST" >> "$C"
         fi
     fi
+    # S10 corrections; configs before S11 lack the keys (read as false)
+    for KV in ${FIX_ORDER:+nb.fix.order=$FIX_ORDER} ${FIX_D2:+nb.fix.d2=$FIX_D2}; do
+        K=${KV%%=*}
+        if grep -q "^${K}=" "$C"; then
+            sed -i "s|^${K}=.*|${KV}|" "$C"
+        else
+            echo "$KV" >> "$C"
+        fi
+    done
     [ -n "$EP_STRUCTURE" ] && sed -i "s|^nb\.ep\.structure=.*|nb.ep.structure=$EP_STRUCTURE|" "$C"
 
     CONFW=$(javapath "$SDIR/conf")
