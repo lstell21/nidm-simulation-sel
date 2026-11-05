@@ -339,6 +339,25 @@ the nI infected neighbours uniformly at random. The draw comes from its own
 which writes a network attribute. With the flag off no extra code runs. See
 `src/main/java/nl/uu/socnetid/nidm/io/csv/TieEventLog.java`.
 
+**Checked 5 Nov 2026 on `70dcf43` (the final build: batch jar SHA-256
+`c4759c0d…`, as in bundle `selcor-final-70dcf43`), N = 80, 200 runs each with
+the flag on and off** (`tie1`'s options as `final.sh` passes them: dynamic, ω
+random, γ ~ U[0.1, 0.2], α ~ U[0, 0.9], 16 encounters, `--fix-order
+--fix-d2`, burn-in 30, `nb.zeta.post` 10):
+- The flag does not change the model: final size by condition, KS p = .58
+  (selective, 105 runs on / 94 off) and .62 (random, 95 / 106); both existing
+  CSVs have identical columns.
+- The counts agree in all 200 runs: dissolve events, form events, and
+  transmissions + index case = ever infected.
+- Both files line up with `round-summary.csv` round by round (200/200): every
+  tie event and transmission falls in an outbreak round, and 1 + the
+  transmissions up to a round = the ever infected in that round. No
+  transmission is at or before the burn-in's last round (30); the earliest is
+  round 31.
+- A run writes ~360 tie events (28 KiB) and ~30 transmissions (1.8 KiB);
+  17 s per run with the flag on and off alike (7 shards per arm, both arms at
+  once, 8 min 43 s on the laptop).
+
 **Checked 20 Oct 2026, N = 80, 200 runs each with the flag on and off**
 (dynamic, ω random):
 - The flag does not change the model: final size by condition, KS p = .72 /
