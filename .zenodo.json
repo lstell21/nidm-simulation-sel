@@ -1,0 +1,11 @@
+{
+  "title": "nidm-simulation-sel: simulation code of the selective contact reduction study (selcor-v1.0)",
+  "upload_type": "software",
+  "version": "selcor-v1.0",
+  "description": "Agent-based simulation of selective contact reduction during disease outbreaks, extending the Networking during Infectious Diseases Model (NIDM). The simulation output archived at https://doi.org/10.5281/zenodo.24561685 was produced by build 70dcf43 of this code; later commits change documentation and repository files only, not the code.",
+  "creators": [
+    {"name": "Stellbrink, Leonard", "orcid": "0000-0003-2188-1743"},
+    {"name": "Nunner, Hendrik", "orcid": "0000-0002-4083-3651"},
+    {"name": "Calero Valdez, André", "orcid": "0000-0002-6214-1461"}
+  ]
+}

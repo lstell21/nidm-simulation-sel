@@ -149,6 +149,8 @@ public abstract class UtilityModelParameters {
     // SIMULATION
     // time steps network initialization stage
     private int zeta;
+    // rounds after an outbreak (nb.zeta.post); null: as zeta
+    private Integer zetaPost = null;
     // time steps epidemic stage
     private int epsilon;
     // simulations per parameter combination
@@ -1326,6 +1328,23 @@ public abstract class UtilityModelParameters {
      */
     public void setZeta(int zeta) {
         this.zeta = zeta;
+    }
+
+    /**
+     * The number of rounds of the stage after an outbreak (nb.zeta.post; S11b). zeta sets the
+     * burn-in; without nb.zeta.post the stage after an outbreak runs zeta rounds too, as before.
+     *
+     * @return the zetaPost, or zeta if it is not set
+     */
+    public int getZetaPost() {
+        return this.zetaPost == null ? this.zeta : this.zetaPost;
+    }
+
+    /**
+     * @param zetaPost the number of rounds after an outbreak; null: as zeta
+     */
+    public void setZetaPost(Integer zetaPost) {
+        this.zetaPost = zetaPost;
     }
 
     /**

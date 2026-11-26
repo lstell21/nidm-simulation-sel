@@ -25,11 +25,16 @@
  */
 package nl.uu.socnetid.nidm.networks;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,6 +48,7 @@ import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.graphstream.algorithm.Toolkit;
+import org.graphstream.graph.Edge;
 import org.graphstream.graph.implementations.SingleGraph;
 
 import nl.uu.socnetid.nidm.agents.Agent;
@@ -55,6 +61,7 @@ import nl.uu.socnetid.nidm.simulation.SimulationListener;
 import nl.uu.socnetid.nidm.io.csv.TieEventLog;
 import nl.uu.socnetid.nidm.stats.DijkstraShortestPath;
 import nl.uu.socnetid.nidm.stats.StatsComputer;
+import nl.uu.socnetid.nidm.utility.InfectedCostCheck;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
 /**
@@ -87,6 +94,11 @@ public class Network extends SingleGraph implements SimulationListener {
 
     // tie-level output (export.tie.events); null when off, so the agents' hooks do nothing
     private TieEventLog tieEventLog = null;
+    // shadow check of the infected agents' disease cost (check.infected.cost); null when off
+    private InfectedCostCheck infectedCostCheck = null;
+    // corrections of the code checks S10 (nb.fix.order, nb.fix.d2); false: the code as before
+    private boolean fixOrder = false;
+    private boolean fixD2 = false;
 
 
     /**
@@ -467,6 +479,143 @@ public class Network extends SingleGraph implements SimulationListener {
      */
     public void setTieEventLog(TieEventLog tieEventLog) {
         this.tieEventLog = tieEventLog;
+    }
+
+    /**
+     * Gets the shadow check of the infected agents' disease cost (check.infected.cost).
+     *
+     * @return the check, or null if it is off
+     */
+    public InfectedCostCheck getInfectedCostCheck() {
+        return this.infectedCostCheck;
+    }
+
+    /**
+     * Sets the shadow check of the infected agents' disease cost (check.infected.cost).
+     *
+     * @param infectedCostCheck
+     *          the check
+     */
+    public void setInfectedCostCheck(InfectedCostCheck infectedCostCheck) {
+        this.infectedCostCheck = infectedCostCheck;
+    }
+
+    /**
+     * Whether agents act in a random order in every round (nb.fix.order): see
+     * Simulation.computeAgentDynamics().
+     *
+     * @return true if the order is drawn at random
+     */
+    public boolean isFixOrder() {
+        return this.fixOrder;
+    }
+
+    /**
+     * Sets whether agents act in a random order in every round (nb.fix.order).
+     *
+     * @param fixOrder
+     *          true for a random order
+     */
+    public void setFixOrder(boolean fixOrder) {
+        this.fixOrder = fixOrder;
+    }
+
+    /**
+     * Whether each second-degree neighbour is a candidate once, not once per shared neighbour
+     * (nb.fix.d2): see Agent.computeRound().
+     *
+     * @return true if each second-degree neighbour is a candidate once
+     */
+    public boolean isFixD2() {
+        return this.fixD2;
+    }
+
+    /**
+     * Sets whether each second-degree neighbour is a candidate once (nb.fix.d2).
+     *
+     * @param fixD2
+     *          true for once
+     */
+    public void setFixD2(boolean fixD2) {
+        this.fixD2 = fixD2;
+    }
+
+    /**
+     * Gets the network's ties as pairs of agent ids, the lower id first, sorted by the first and
+     * then the second id. The pairs come from the edges' end nodes, not from the edge ids (which
+     * concatenate the two agent ids without a separator).
+     *
+     * @return the ties as pairs of agent ids
+     */
+    public List<long[]> getTies() {
+        List<long[]> ties = new ArrayList<long[]>(this.getEdgeCount());
+        for (Edge edge : this.getEdgeSet()) {
+            long id0 = Long.parseLong(edge.getNode0().getId());
+            long id1 = Long.parseLong(edge.getNode1().getId());
+            ties.add(new long[] {Math.min(id0, id1), Math.max(id0, id1)});
+        }
+        Collections.sort(ties, Comparator.comparingLong((long[] tie) -> tie[0]).thenComparingLong(tie -> tie[1]));
+        return ties;
+    }
+
+    /**
+     * Restores the given ties: removes every tie that is not in the list and adds every tie of
+     * the list that is missing. Paired design: the adapting arm starts from the network the frozen
+     * arm started from. Evaluates no utilities and draws no random numbers; agent attributes other
+     * than the ties stay as they are.
+     *
+     * @param ties
+     *          the ties as pairs of agent ids (see getTies)
+     */
+    public void restoreTies(List<long[]> ties) {
+        Set<String> keep = new HashSet<String>(ties.size() * 2);
+        for (long[] tie : ties) {
+            keep.add(tie[0] + "-" + tie[1]);
+        }
+        // removals first: an edge id freed by a removal may be needed by an addition
+        int removed = 0;
+        for (long[] tie : this.getTies()) {
+            if (!keep.contains(tie[0] + "-" + tie[1])) {
+                Agent agent = this.getNode(String.valueOf(tie[0]));
+                agent.removeConnection(this.getNode(String.valueOf(tie[1])));
+                removed++;
+            }
+        }
+        int added = 0;
+        for (long[] tie : ties) {
+            Agent agent = this.getNode(String.valueOf(tie[0]));
+            Agent other = this.getNode(String.valueOf(tie[1]));
+            if (!agent.hasEdgeBetween(other)) {
+                agent.addConnection(other);
+                added++;
+            }
+        }
+        logger.debug("Ties restored: " + removed + " removed, " + added + " added.");
+    }
+
+    /**
+     * Gets the SHA-256 hash of the canonical edge list: one line "lower id-higher id" per tie, in
+     * the order of getTies.
+     *
+     * @return the hash as hexadecimal string
+     */
+    public String getEdgeListHash() {
+        StringBuilder edgeList = new StringBuilder();
+        for (long[] tie : this.getTies()) {
+            edgeList.append(tie[0]).append('-').append(tie[1]).append('\n');
+        }
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(
+                    edgeList.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(2 * hash.length);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // every Java platform implements SHA-256
+            throw new IllegalStateException(e);
+        }
     }
 
     /**

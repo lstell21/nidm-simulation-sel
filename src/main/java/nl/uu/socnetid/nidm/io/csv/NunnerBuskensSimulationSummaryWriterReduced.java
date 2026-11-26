@@ -31,9 +31,11 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import nl.uu.socnetid.nidm.data.out.DataGeneratorData;
+import nl.uu.socnetid.nidm.data.out.EpidemicStructures;
 import nl.uu.socnetid.nidm.data.out.LogValues;
 import nl.uu.socnetid.nidm.data.out.NunnerBuskensParameters;
 import nl.uu.socnetid.nidm.stats.AgentStatsPost;
+import nl.uu.socnetid.nidm.system.PropertiesHandler;
 
 /**
  * @author Hendrik Nunner
@@ -131,6 +133,22 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         cols.add(LogValues.DV_NET_DYNAMIC_CONS_OUT_DECLINED_EPIDEMIC.toString());
         cols.add(LogValues.DV_NET_DYNAMIC_CONS_IN_ACCEPTED_EPIDEMIC.toString());
         cols.add(LogValues.DV_NET_DYNAMIC_CONS_IN_DECLINED_EPIDEMIC.toString());
+
+        // CHECKS (last, so the columns above keep their positions)
+        // shadow check of the infected agents' disease cost
+        if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
+            cols.add(LogValues.DV_CHECK_INFECTED_COST_N.toString());
+            cols.add(LogValues.DV_CHECK_INFECTED_COST_DIFF.toString());
+        }
+        // paired design: both arms started from the same network
+        if (this.dgData.getUtilityModelParams().getEpStructure() == EpidemicStructures.BOTH) {
+            cols.add(LogValues.DV_PAIRED_START_IDENTICAL.toString());
+        }
+        // corrections of the code checks S10, in every run (false: the code as before S11)
+        cols.add(LogValues.IV_NB_FIX_ORDER.toString());
+        cols.add(LogValues.IV_NB_FIX_D2.toString());
+        // rounds after the outbreak (S11b; nb.zeta when the key is absent)
+        cols.add(LogValues.IV_NB_ZETA_POST.toString());
 
         writeLine(cols);
     }
@@ -248,6 +266,21 @@ public class NunnerBuskensSimulationSummaryWriterReduced extends CsvFileWriter<N
         currData.add(String.valueOf(declinedRequestsOutEpidemic));
         currData.add(String.valueOf(acceptedRequestsInEpidemic));
         currData.add(String.valueOf(declinedRequestsInEpidemic));
+
+        // CHECKS
+        // shadow check of the infected agents' disease cost
+        if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
+            currData.add(String.valueOf(this.dgData.getSimStats().getCheckInfectedCostN()));
+            currData.add(String.valueOf(this.dgData.getSimStats().getCheckInfectedCostDiff()));
+        }
+        // paired design: both arms started from the same network
+        if (this.dgData.getUtilityModelParams().getEpStructure() == EpidemicStructures.BOTH) {
+            currData.add(String.valueOf(this.dgData.getSimStats().isPairedStartIdentical()));
+        }
+        // corrections of the code checks S10
+        currData.add(String.valueOf(PropertiesHandler.getInstance().isFixOrder()));
+        currData.add(String.valueOf(PropertiesHandler.getInstance().isFixD2()));
+        currData.add(String.valueOf(this.dgData.getUtilityModelParams().getZetaPost()));
 
         writeLine(currData);
     }

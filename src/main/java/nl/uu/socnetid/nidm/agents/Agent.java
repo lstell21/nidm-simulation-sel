@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -58,6 +59,7 @@ import nl.uu.socnetid.nidm.networks.Network;
 import nl.uu.socnetid.nidm.stats.AgentConnectionStats;
 import nl.uu.socnetid.nidm.stats.DijkstraShortestPath;
 import nl.uu.socnetid.nidm.stats.StatsComputer;
+import nl.uu.socnetid.nidm.utility.InfectedCostCheck;
 import nl.uu.socnetid.nidm.utility.Utility;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
@@ -595,6 +597,23 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
     }
 
     /**
+     * The second-degree candidates of computeRound. getConnectionsAtDistance2() lists a
+     * second-degree neighbour once per shared neighbour, so in the shuffled branch the draw is
+     * weighted by shared neighbours (code checks S10, item 1). With nb.fix.d2 on, each one is
+     * listed once (first occurrence kept); the sorted branch draws the same agents as with the
+     * repeats, which only sat next to each other. Off: the list as it is (as up to S11).
+     *
+     * @return the agent's second-degree candidates
+     */
+    private List<Agent> getCandidatesAtDistance2() {
+        List<Agent> connectionsDist2 = this.getConnectionsAtDistance2();
+        if (this.getNetwork().isFixD2()) {
+            return new ArrayList<Agent>(new LinkedHashSet<Agent>(connectionsDist2));
+        }
+        return connectionsDist2;
+    }
+
+    /**
      * Gets the agent's co-agents.
      *
      * @return the agent's co-agents
@@ -1060,10 +1079,10 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         List<Agent> distance1AgentsShuffled = new ArrayList<Agent>(this.getConnections());
         Collections.shuffle(distance1AgentsShuffled);
        
-        // distance 2
-        List<Agent> distance2AgentsAssorted = new ArrayList<Agent>(this.getConnectionsAtDistance2());
+        // distance 2 (nb.fix.d2: see getCandidatesAtDistance2)
+        List<Agent> distance2AgentsAssorted = new ArrayList<Agent>(this.getCandidatesAtDistance2());
         sortByAssortativityConditions(distance2AgentsAssorted, true);									// most similar first --> if creating a tie, consider most similar first
-        List<Agent> distance2AgentsShuffled = new ArrayList<Agent>(this.getConnectionsAtDistance2());
+        List<Agent> distance2AgentsShuffled = new ArrayList<Agent>(this.getCandidatesAtDistance2());
         Collections.shuffle(distance2AgentsShuffled);
         
         // all other agents
@@ -1074,17 +1093,16 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         List<Agent> allAgentsShuffled = new ArrayList<Agent>(this.getNetwork().getAgents());
         Collections.shuffle(allAgentsShuffled);
         allAgentsShuffled.removeAll(distance1AgentsShuffled);
-        // KNOWN DIVERGENCE -- deliberately left unchanged (decision 8 Oct 2026).
-        // The next statement removes the distance-2 agents from allAgentsAssorted a
-        // second time (line 1071 already did so); the evidently intended target was
-        // allAgentsShuffled, mirroring the two lines above. Consequence: in the
-        // non-assorted branch (randOmega > omega) the "random others" pool still
-        // contains second-degree neighbours, so the effective xi there is slightly
-        // above the configured value and the encounter-set composition depends
-        // weakly on omega. Runs A and B (2 Sep 2026) were generated with this
-        // behaviour, so it is kept as is for comparability with those batches.
-        // See batch/README.md, "Known divergences from the manuscript algorithms".
-        allAgentsAssorted.removeAll(distance2AgentsShuffled);
+        // FIXED ON rerun-fixes (decision 30 Oct 2026; formerly the KNOWN DIVERGENCE at line
+        // 1087). Up to October 2026 the next statement read
+        // allAgentsAssorted.removeAll(distance2AgentsShuffled): it removed the distance-2
+        // agents from allAgentsAssorted a second time (see above), so in the non-assorted
+        // branch (randOmega > omega) the "random others" pool still contained second-degree
+        // neighbours, the effective xi there was slightly above the configured value and the
+        // encounter-set composition depended weakly on omega. Every batch up to October 2026
+        // (Runs A and B, Phase 3, the mechanism run) was generated with that behaviour.
+        // See batch/README.md, "Fixes on rerun-fixes".
+        allAgentsShuffled.removeAll(distance2AgentsShuffled);
         
         while (agentsProcessed.size() < decisions) {
 
@@ -1178,7 +1196,15 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      * @return true if the new connection adds value to the overall utility of an agent
      */
     public boolean newConnectionValuable(Agent newConnection) {
-        return this.getUtilityWith(newConnection).getOverallUtility() >= this.getUtility().getOverallUtility();
+        Utility utilityWith = this.getUtilityWith(newConnection);
+        Utility utility = this.getUtility();
+        boolean valuable = utilityWith.getOverallUtility() >= utility.getOverallUtility();
+        // shadow check (check.infected.cost); observes only, null when off or not infected
+        InfectedCostCheck infectedCostCheck = this.getInfectedCostCheck();
+        if (infectedCostCheck != null) {
+            infectedCostCheck.compare("newConnectionValuable", this, newConnection, utilityWith, utility, false, valuable);
+        }
+        return valuable;
     }
 
     /**
@@ -1190,12 +1216,18 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      */
     public boolean connectTo(Agent agent) {
         // other agent accepting connection?
-        double currUtility = agent.getUtility().getOverallUtility();
+        Utility currUtility = agent.getUtility();
         // TODO use connectionValuableWith to avoid GUI glitches
         agent.addConnection(this);
-        double newUtility = agent.getUtility().getOverallUtility();
+        Utility newUtility = agent.getUtility();
         agent.removeConnection(this);
-        if (newUtility >= currUtility) {
+        boolean accepted = newUtility.getOverallUtility() >= currUtility.getOverallUtility();
+        // shadow check (check.infected.cost) for the accepting agent; observes only
+        InfectedCostCheck infectedCostCheck = agent.getInfectedCostCheck();
+        if (infectedCostCheck != null) {
+            infectedCostCheck.compare("connectTo (acceptance)", agent, this, newUtility, currUtility, false, accepted);
+        }
+        if (accepted) {
             addConnection(agent);
             trackAcceptedRequestOut();
             agent.trackAcceptedRequestIn();
@@ -1219,7 +1251,31 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      * @return true if the existing connection create more costs than it provides benefits
      */
     public boolean existingConnectionTooCostly(Agent existingConnection) {
-        return this.getUtilityWithout(existingConnection).getOverallUtility() > this.getUtility().getOverallUtility();
+        Utility utilityWithout = this.getUtilityWithout(existingConnection);
+        Utility utility = this.getUtility();
+        boolean tooCostly = utilityWithout.getOverallUtility() > utility.getOverallUtility();
+        // shadow check (check.infected.cost); observes only, null when off or not infected
+        InfectedCostCheck infectedCostCheck = this.getInfectedCostCheck();
+        if (infectedCostCheck != null) {
+            infectedCostCheck.compare("existingConnectionTooCostly", this, existingConnection, utilityWithout, utility,
+                    true, tooCostly);
+        }
+        return tooCostly;
+    }
+
+    /**
+     * Gets the shadow check of the infected agents' disease cost (check.infected.cost) for a
+     * decision of this agent. Reads the disease group only; never calls
+     * Network.hasActiveInfection(), which writes a network attribute.
+     *
+     * @return the check if it is on and this agent is infected, null otherwise
+     */
+    private InfectedCostCheck getInfectedCostCheck() {
+        InfectedCostCheck infectedCostCheck = this.getNetwork().getInfectedCostCheck();
+        if (infectedCostCheck == null || !this.isInfected()) {
+            return null;
+        }
+        return infectedCostCheck;
     }
 
     /**
@@ -1509,8 +1565,14 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         return Long.valueOf(agent2.getId()) > Long.valueOf(agent1.getId()) ? agent2 : agent1;
     }
 
+    /**
+     * Gets the id of a new edge: the lower agent id, "-", the higher agent id. Until rerun-fixes
+     * the ids were concatenated without a separator, so pairs such as 1-112 and 11-12 shared the
+     * id "1112" (from N = 112 on). Ties are looked up by adjacency (hasEdgeBetween,
+     * getEdgeBetween), never by id, so edges read from DGS files with the old ids still work.
+     */
     private String getEdgeId(Agent agent1, Agent agent2) {
-        return this.getAgent1(agent1, agent2).getId().concat(this.getAgent2(agent1, agent2).getId());
+        return this.getAgent1(agent1, agent2).getId() + "-" + this.getAgent2(agent1, agent2).getId();
     }
 
     /**
@@ -1530,7 +1592,7 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         String edgeId = this.getEdgeId(this, newConnection);
 
         Network network = this.getNetwork();
-        if (network.getEdge(edgeId) == null) {
+        if (!this.hasEdgeBetween(newConnection)) {
             Agent agent1 = this.getAgent1(this, newConnection);
             Agent agent2 = this.getAgent2(this, newConnection);
             network.addEdge(edgeId, agent1.getId(), agent2.getId());
@@ -1546,7 +1608,7 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
      * @return true if there is a connection, false otherwise
      */
     public boolean isDirectlyConnectedTo(Agent agent) {
-        return this.getNetwork().getEdge(this.getEdgeId(this, agent)) != null;
+        return this.hasEdgeBetween(agent);
     }
 
     /**
@@ -1560,7 +1622,7 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
         Iterator<Agent> neighborIt = this.getNeighborNodeIterator();
         while (neighborIt.hasNext()) {
             Agent neighbor = neighborIt.next();
-            if (this.getNetwork().getEdge(this.getEdgeId(neighbor, agent)) != null) {
+            if (neighbor.hasEdgeBetween(agent)) {
                 return true;
             }
         }
@@ -1630,18 +1692,12 @@ public class Agent extends SingleNode implements Comparable<Agent>, Runnable {
             return;
         }
 
-        // edge id consistency
-        ArrayList<Agent> tmpAgents = new ArrayList<Agent>();
-        tmpAgents.add(this);
-        tmpAgents.add(connection);
-        Collections.sort(tmpAgents);
-
-        // remove
+        // remove the edge between the two agents, found by adjacency (until rerun-fixes by an id
+        // built without a separator, which could name another pair's edge; see getEdgeId)
         Network network = this.getNetwork();
-        String edgeId = String.valueOf(tmpAgents.get(0).getId()) + String.valueOf(tmpAgents.get(1).getId());
-        Edge edge = network.getEdge(edgeId);
+        Edge edge = this.getEdgeBetween(connection);
         if (edge != null) {
-            network.removeEdge(edgeId);
+            network.removeEdge(edge);
             notifyConnectionRemoved(edge);
         }
     }

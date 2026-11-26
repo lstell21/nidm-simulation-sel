@@ -41,5 +41,9 @@ bfg-report*
 
 # batch harness output (run-batch.sh defaults --out to batch-runs/<timestamp>)
 batch-runs/
+# cluster bundles (batch/slurm/make-bundle.sh)
+dist/
 # stray R plots
 Rplots.pdf
+# internal working documents, not part of the release
+notes-internal/

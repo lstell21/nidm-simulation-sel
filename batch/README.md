@@ -155,7 +155,7 @@ hidden Windows process (`powershell Start-Process -WindowStyle Hidden`), with
 its own console, so neither Ctrl-C nor closing the launch window should reach
 it. Elsewhere it uses `setsid`. `DETACH=0` restores the old attached launch,
 and the script then warns that Ctrl-C kills the run. **Not yet verified with a
-real Ctrl-C** (it cannot be tested from inside a Claude Code session). Test it
+real Ctrl-C** (it cannot be tested from a script). Test it
 once, with nothing else running, before relying on it:
 
 ```sh
@@ -202,15 +202,18 @@ pre-epidemic network, seeds one index case, runs the epidemic once on the
 **frozen** network (no tie formation or dissolution while an infection is
 active — `Simulation.java:300`), resets the disease states, and then runs it
 again from the **same index case** with the network dynamic
-(`NunnerBuskensDataGenerator.java:464-475`). The starting network of the
-dynamic arm is the pre-epidemic network **after one round of tie revisions**:
-in the round in which the static outbreak ends, the infection is marked
-defeated and agents revise ties in that same round, also in the static arm
-(`Simulation.java:296-302`), and the generator reuses the network object. In
-Phase 3 this changed 86–88 % of starting networks, by small amounts that do not
-depend on `s` (mean |Δ| degree ≈ 0.03 at degree ≈ 7.7, clustering and
-assortativity ≈ 0.004–0.005; no infection is present in that round, so
-selection does not act). Each simulation therefore
+(`NunnerBuskensDataGenerator.java:485-505`). Up to October 2026 the starting
+network of the dynamic arm was the pre-epidemic network **after one round of
+tie revisions**: in the round in which the static outbreak ends, the infection
+is marked defeated and agents revise ties in that same round, also in the
+static arm (`Simulation.java:296-302`), and the generator reuses the network
+object. In Phase 3 this changed 86–88 % of starting networks, by small amounts
+that do not depend on `s` (mean |Δ| degree ≈ 0.03 at degree ≈ 7.7, clustering
+and assortativity ≈ 0.004–0.005; no infection is present in that round, so
+selection does not act). On `rerun-fixes` the generator records the tie list
+after the burn-in and restores it before the dynamic arm, so both arms start
+from the same network; `simulation-summary.csv` ends with
+`paired.start.identical` (see "Fixes on `rerun-fixes`"). Each simulation therefore
 yields a paired outcome: `net.static.pct.rec` (no adaptation) against
 `net.dynamic.pct.rec` (adaptation, selective or random according to `s`).
 The static arm does not depend on `s` (selection acts only while an infection
@@ -221,16 +224,10 @@ selectively, inside one network rather than across independent draws.
 γ is narrowed to U[0.1, 0.2] because the α × γ interaction the paper has to
 explain lives at low γ; 10,000 outbreaks per N inside that band give three
 times the density Run A has there. α stays U[0, 1] because that interaction is
-read along α, and its shape depends on the model it is read through. The
-preprint's linear α × γ specification (Figure 3c) gives a γ = 0.1 curve that
-rises from ~0.16 at α = 0 to ~0.32 at α = 1 and crosses the other γ curves near
-α ≈ 0.87 (the reading recorded here on 28 Aug 2026). The current manuscript's
-spline model and binned estimates (Figure 5(c), Figure 8, Appendix Fig. B.8)
-show instead a peak at α ≈ 0.4–0.5 for γ ≤ 0.25 (binned, γ 0.10–0.15:
-17.0 % → 37.6 % → 7.0 %). The design decision is the same under both: γ in
-[0.1, 0.2] with α left at U[0, 1] — the α ~ U[0, 0.3] first planned would miss
-the high-α crossover of the one reading and the peak and decline of the other.
-Phase 3 then measures the shape directly: the static arm traces outbreak size
+read along α: the manuscript's spline model and binned estimates (Figure 5(c),
+Figure 8, Appendix Fig. B.8) show a peak at α ≈ 0.4–0.5 for γ ≤ 0.25 (binned,
+γ 0.10–0.15: 17.0 % → 37.6 % → 7.0 %), and the α ~ U[0, 0.3] first planned
+would miss the peak and its decline. Phase 3 then measures the shape directly: the static arm traces outbreak size
 along α with no contact adaptation, on the pre-epidemic networks the dynamic
 arm starts from (up to the one revision round described above).
 ω stays random (as Run A) so the ω gradient can be re-read with the static
@@ -240,8 +237,8 @@ counterfactual alongside.
 
 | file | change against a dynamic batch |
 |---|---|
-| `simulation-summary.csv` | `nb.ep.structure` is `both` in every row. The `net.static.*` block (`net.static.pct.rec`, `net.static.epidemic.duration`, `net.static.epidemic.peak.size`, `net.static.av.clustering.post`, …) is populated instead of empty; `net.dynamic.*` as before. `net.*.pre.epidemic.*` describes the one shared pre-epidemic network. |
-| `round-summary.csv` | `nb.ep.structure` is `static` or `dynamic` **per round** (`NunnerBuskensRoundSummaryWriter.java:79`). Every `sim.cnt` has two `active-epidemic` stretches in `sim.stage` (values are lower-case in the CSV): the static one directly after the burn-in, then one `stopped-epidemic` round still labelled `static` (the tie-revision round described above), then the dynamic one (no post-epidemic phase in between; `sim.round` keeps counting). The dynamic outbreak therefore does **not** start at round ζ+1 = 11. |
+| `simulation-summary.csv` | `nb.ep.structure` is `both` in every row. The `net.static.*` block (`net.static.pct.rec`, `net.static.epidemic.duration`, `net.static.epidemic.peak.size`, `net.static.av.clustering.post`, …) is populated instead of empty; `net.dynamic.*` as before. `net.*.pre.epidemic.*` describes the one shared pre-epidemic network. On `rerun-fixes` the last column is `paired.start.identical`. |
+| `round-summary.csv` | `nb.ep.structure` is `static` or `dynamic` **per round** (`NunnerBuskensRoundSummaryWriter.java:79`). Every `sim.cnt` has two `active-epidemic` stretches in `sim.stage` (values are lower-case in the CSV): the static one directly after the burn-in, then one `stopped-epidemic` round still labelled `static` (the tie-revision round described above; on `rerun-fixes` its tie changes are undone before the dynamic arm, so this row's network measures are not the dynamic arm's start), then the dynamic one (no post-epidemic phase in between; `sim.round` keeps counting). The dynamic outbreak therefore does **not** start at round ζ+1 = 11. |
 | `config.properties` (per shard) | `nb.ep.structure=both` |
 
 What this meant for `SelSWIDM-analysis` (implemented 9 Oct 2026 as design
@@ -336,6 +333,25 @@ the nI infected neighbours uniformly at random. The draw comes from its own
 which writes a network attribute. With the flag off no extra code runs. See
 `src/main/java/nl/uu/socnetid/nidm/io/csv/TieEventLog.java`.
 
+**Checked 5 Nov 2026 on `70dcf43` (the final build: batch jar SHA-256
+`c4759c0d…`, as in bundle `selcor-final-70dcf43`), N = 80, 200 runs each with
+the flag on and off** (`tie1`'s options as `final.sh` passes them: dynamic, ω
+random, γ ~ U[0.1, 0.2], α ~ U[0, 0.9], 16 encounters, `--fix-order
+--fix-d2`, burn-in 30, `nb.zeta.post` 10):
+- The flag does not change the model: final size by condition, KS p = .58
+  (selective, 105 runs on / 94 off) and .62 (random, 95 / 106); both existing
+  CSVs have identical columns.
+- The counts agree in all 200 runs: dissolve events, form events, and
+  transmissions + index case = ever infected.
+- Both files line up with `round-summary.csv` round by round (200/200): every
+  tie event and transmission falls in an outbreak round, and 1 + the
+  transmissions up to a round = the ever infected in that round. No
+  transmission is at or before the burn-in's last round (30); the earliest is
+  round 31.
+- A run writes ~360 tie events (28 KiB) and ~30 transmissions (1.8 KiB);
+  17 s per run with the flag on and off alike (7 shards per arm, both arms at
+  once, 8 min 43 s on the laptop).
+
 **Checked 20 Oct 2026, N = 80, 200 runs each with the flag on and off**
 (dynamic, ω random):
 - The flag does not change the model: final size by condition, KS p = .72 /
@@ -347,6 +363,43 @@ which writes a network attribute. With the flag off no extra code runs. See
   (2.5 KiB), with no measurable change in s/sim.
 - In `--ep-structure both` batches, `transmissions.csv` also holds the
   static arm's infections; they come earlier in `sim.round`.
+
+## Exploratory batch (`exploratory.sh`, before the re-run)
+
+Design diagnostics before the final re-run batches; design and rules are fixed
+in `exploratory_criteria.md` (30 Oct 2026, section 2). The
+data may be used only for the diagnostics listed there, never for a result.
+`batch/exploratory.sh` runs the three arms one after the other with
+`run-batch.sh`, from the `rerun-fixes` build it makes itself:
+
+| arm | settings | runs |
+|---|---|---|
+| `EX-A` | main design, ω ~ U[0, 1] | 300 per N |
+| `EX-B` | ω = 0 | 150 per N |
+| `EX-P` | `--ep-structure both`, γ ~ U[0.1, 0.2] | 150 pairs per N |
+
+All arms: default N grid, `--encounters 16`, `--no-centralities`, round
+summaries on. Run from the root of a clean clone on `rerun-fixes`:
+
+```sh
+mkdir -p batch-runs
+nohup ./batch/exploratory.sh --shards 16 >> batch-runs/exploratory.log 2>&1 &
+```
+
+`--shards` defaults to the number of cores − 1. The script takes the lock
+`batch-runs/exploratory.lock`, builds with Maven (and checks that
+`git.properties` names HEAD, not dirty), writes each arm to
+`batch-runs/exploratory/<arm>/` (with that arm's `batch-info.txt`), checks the
+number of runs and, for `EX-P`, that `paired.start.identical` is `true` in
+every pair (criteria R4; otherwise it stops), and packs
+`batch-runs/exploratory/<arm>.tgz` with `<arm>.tgz.sha256`.
+
+After an interruption, start it again: arms with a `.done` marker are not run
+again, so it resumes with the next arm. An arm that started but did not finish
+stops the script with the `mv` command that moves it aside (`run-batch.sh`
+cannot resume a batch). A leftover lock is reported; remove it only when no
+java process of the batch runs. `--reps R` and `--ngrid L` are for smoke tests
+only.
 
 ## Running on another machine
 
@@ -432,6 +485,244 @@ survives the whole run (`nohup`/`tmux`/`screen`) and loses everything on a
 restart. `--shards` / `SHARDS` should not exceed the number of physical cores
 (see "Why it shards").
 
+## Running on the AI-Lab cluster (`batch/slurm/`, final batches)
+
+The final re-run batches (selcor-handoff `exploratory_criteria.md`, section 6,
+fixed 1 Nov 2026; build `rerun-fixes` `490a1c7` or later) run on the
+Univ. Lübeck AI-Lab cluster: Slurm 24.05, partition `defq`, AMD EPYC 7742
+nodes. Nothing is built or run on the login node, and the compute nodes need
+neither git nor Maven, only the Java 8 runtime at
+`$HOME/opt/jdk8u502-b07-jre` (Temurin 1.8.0_502-b07, as on the laptop;
+`/home` is NFS and visible on every node). Three files:
+
+- `make-bundle.sh` (laptop) packs `git archive HEAD` without `data/`, the
+  batch jar and `BUNDLE-PROVENANCE.txt` into
+  `dist/selcor-final-<short hash>.tgz` with a `.sha256` file. The cluster runs
+  exactly this bundle. `data/` (about 4.3 GB of Git LFS data from the
+  2019–2021 projects) is left out: no batch reads it.
+- `final.sh <batch>` runs one batch through `run-batch.sh` in batch-jar mode
+  (so the shard allocation, the shard configs and the `split/` layout are the
+  exploratory batch's), checks it and packs `<batch>.tgz`.
+- `final.sbatch` is the Slurm job around `final.sh`.
+
+Every batch so far ran under Git Bash on Windows. On Linux, `run-batch.sh`
+built each shard's classpath from empty strings (its `cygpath` fallback never
+ran), so every shard would have failed at once; fixed with this launcher. In a
+bundle, `run-batch.sh` takes the git lines of `batch-info.txt` from
+`BUNDLE-PROVENANCE.txt` (there is no `.git`), and the new `--jvm-opts` passes
+JVM options to every shard.
+
+| batch | options (all: `--encounters 16 --no-centralities`) | runs | heap |
+|---|---|---|---|
+| `main` | `--omega-random --alpha-max 0.9`, N 80–480 | 10,000 per N | 1g |
+| `w0` | `--omega 0 --alpha-max 0.9` | 10,000 per N | 1g |
+| `paired` | `--omega-random --ep-structure both --gamma-min 0.1 --gamma-max 0.2 --alpha-max 0.9` | 10,000 pairs per N | 1g |
+| `tie1` | `--ngrid 240 --gamma-min 0.1 --gamma-max 0.2 --omega-random --alpha-min 0 --alpha-max 0.9 --tie-events` (the mechanism launch's M1) | 5,000 | 2g |
+| `tie2` | `--ngrid 240 --gamma-min 0.1 --gamma-max 0.4 --omega 0 --alpha-max 0.9 --tie-events` (M2) | 5,000 | 2g |
+| `exa80` | `--ngrid 80 --omega-random`: arm `EX-A`'s options, α ~ U[0, 1] | 300 | 1g |
+| `robust` | nine cells, see below | 20,000 / 5,000 / 1,000 per arm at N = 80 / 240 / 480 | 1g |
+
+`exa80` is the cluster check against the exploratory batch: the same design
+as `EX-A` at N = 80, to be compared with its 300 runs there.
+
+**Switches (S11, 3 Nov 2026).** The five final batches always run with
+`--fix-order --fix-d2` (decided 3 Nov, `robustness_criteria.md` D1 and D2;
+see "Known divergences") and with `--zeta Z` from `final.sh --zeta Z`
+(default 10; set after the robustness batch by its rule B). `exa80` keeps
+`EX-A`'s design: switches off, zeta 10. `batch-info.txt` records `zeta`,
+`fix order` and `fix d2`; `simulation-summary.csv` ends with `nb.fix.order`
+and `nb.fix.d2` in every run.
+
+**`robust`** (`robustness_criteria.md`, approved 3 Nov 2026): one job runs
+nine cells one after another, each a `run-batch.sh` batch at one N with the
+main batch's options (`--encounters 16 --no-centralities --omega-random
+--alpha-max 0.9`): arm A switches off, zeta 10; arm B `--fix-order
+--fix-d2`, zeta 10; arm C `--fix-order --fix-d2`, zeta 30 and `--zeta-post
+10`. Order: N = 80 A,
+B, C, then N = 240 A, B, C, then N = 480 A, B, C (every arm of the cheapest N
+first). Cells land in `batch-runs/final/robust/<arm>-n<N>/`, and
+`robust.tgz` holds the four hand-over files of every cell under
+`<arm>-n<N>/`. A completed cell (`.done`) is skipped when the job is
+submitted again, so a resubmission continues with the next cell; a cell
+interrupted half-way stops the job with the `mv` command that moves it aside.
+`--runs-factor F` (0 < F ≤ 1) cuts every cell's runs alike.
+
+**Burn-in and post-outbreak stage (S11b, 3 Nov 2026).** Up to S11, zeta set
+both the burn-in and the stage after each outbreak
+(`NunnerBuskensDataGenerator.simulatePreEpidemic()` and
+`simulatePostEpidemic()` both called `simulateUntilStable(zeta)`; the
+exploratory runs have exactly 10 rounds in each). Now `nb.zeta` sets the
+burn-in only and `nb.zeta.post` (`run-batch.sh --zeta-post P`) the stage
+after each outbreak; without the key it is zeta, so every earlier config and
+batch is unchanged. The summary's outbreak measures are taken when the
+outbreak ends, before that stage. `final.sh` passes `--zeta-post 10` to the
+five final batches and to robust arm C (arms A and B: zeta 10, so 10 as
+well); `simulation-summary.csv` ends with `nb.zeta.post`, `batch-info.txt`
+has a `zeta post` line. zeta = 30 thus adds 20 rounds to every run.
+
+**1. Bundle (laptop),** from a clean clone on `rerun-fixes`:
+
+```sh
+mvn package -DskipTests
+./batch/slurm/make-bundle.sh      # dist/selcor-final-<hash>.tgz and .tgz.sha256
+```
+
+It refuses a dirty tree (untracked files count), a jar whose `git.properties`
+does not name HEAD or says dirty, and an existing bundle of the same name.
+
+**2. Unpack (cluster),** after copying both files to `~/selcor/`:
+
+```sh
+cd ~/selcor
+sha256sum -c selcor-final-<hash>.tgz.sha256
+tar xzf selcor-final-<hash>.tgz && cd selcor-final-<hash>
+cat BUNDLE-PROVENANCE.txt
+```
+
+**3. Submit, from the bundle root.** `exa80` first and alone; then the five
+batches with `--dependency=singleton`. They share the job name
+`selcor-final`, so Slurm starts each only after the previous one has ended
+and the jobs never hold more than 64 CPUs at a time:
+
+```sh
+sbatch --cpus-per-task=16 --mem=24G --time=00:15:00 batch/slurm/final.sbatch exa80
+# the robustness batch (S11, S11b; all runs at 64 CPUs, about 11 h, see "Projections"):
+sbatch --mem=96G --time=17:00:00 batch/slurm/final.sbatch robust
+# after rule B has set zeta (Z = 10 or 30), the five final batches:
+sbatch --dependency=singleton --mem=96G  --time=3-00:00:00 batch/slurm/final.sbatch main   --zeta Z
+sbatch --dependency=singleton --mem=96G  --time=3-00:00:00 batch/slurm/final.sbatch w0     --zeta Z
+sbatch --dependency=singleton --mem=96G  --time=3-00:00:00 batch/slurm/final.sbatch paired --zeta Z
+sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie1   --zeta Z
+sbatch --dependency=singleton --mem=160G --time=03:00:00   batch/slurm/final.sbatch tie2   --zeta Z
+# with Z = 30: --time=4-01:00:00 for main and w0, 3-08:00:00 for paired (tie1, tie2 as above)
+```
+
+`--time` is the projection below times 1.5 (rounded up): a job that reaches
+`--time` is killed and its batch is lost, while a long `--time` costs nothing
+on a partition without a time limit. `--mem`: see "Memory". `robust` runs at
+`--cpus-per-task` 64 unless given otherwise; with 128 CPUs it takes half as
+long.
+
+**Outputs** (default `--out <bundle>/batch-runs/final`):
+`batch-runs/final/<batch>/` (`run-batch.sh`'s layout), the hand-over files
+`batch-runs/final/<batch>.tgz` and `.tgz.sha256` (`split/`, `batch-info.txt`,
+`shard-list.txt`, `config.properties.source`; `SelSWIDM-analysis` unpacks
+the tarball into `data/rerun/<batch>/`), and the job log
+`slurm-selcor-final-<job id>.out` in the bundle root: the plan, every shard's
+rc and elapsed time, the checks. `batch-info.txt` records the commit, branch
+and dirty count from `BUNDLE-PROVENANCE.txt` (with a `bundle` line saying
+so), the jar's SHA-256, Java, the JVM options, and the Slurm job id, node and
+CPUs. `final.sh` checks the bundle (provenance file, no `.git`, the jar's
+SHA-256), Java 1.8.0_502, every shard's rc, the number of runs in `split/`,
+for `paired` that `paired.start.identical` is `true` in every pair, and for
+the tie batches that every shard wrote `tie-events.csv` and
+`transmissions.csv`. Any failure stops it with exit code 1.
+
+**Progress.** `squeue -u $USER`; `tail slurm-selcor-final-<job id>.out`
+(quiet while the shards run: `run-batch.sh` prints per shard only at the
+end); `bash batch/progress.sh final/<batch>` counts the runs written so far
+per shard and projects the end from the slowest shard. It only reads files.
+
+**After an interruption** there is no resume (`run-batch.sh` cannot). The
+next submission stops at once with the command to run first: a batch folder
+without `.done` is moved aside
+(`mv batch-runs/final/<batch> batch-runs/final/<batch>-interrupted-<date>`),
+and a left-over `batch-runs/final/<batch>.lock` is removed with `rmdir` once
+`squeue` shows no job of that batch. Then submit again. A batch with `.done`
+is not run again; only its tarball is packed if it is missing or does not
+verify. `--no-requeue` keeps Slurm from restarting a failed job by itself.
+
+**Shards and JVM.** One shard per Slurm CPU: `final.sh` takes
+`$SLURM_CPUS_PER_TASK` (64 = 32 physical cores, Slurm counts both threads of
+a core), never `nproc`, which inside a job reports all 256 CPUs of the node;
+outside Slurm it needs `--shards`. `run-batch.sh`'s cost model counts shards,
+not cores: it hands the 64 shards to the N levels in proportion to
+reps × N^3.1 (1, 1, 4, 9, 18 and 31 shards for N = 80 … 480) and assumes
+every shard runs at the same speed, so two shards on one core simply both
+run slower. Every JVM gets `-Xms` equal to `-Xmx`, `-XX:+UseSerialGC` and
+`-XX:ActiveProcessorCount=1` (`run-batch.sh --jvm-opts`). Java 8 sizes its
+thread pools from the CPUs it sees, and that is the whole node: the default
+parallel collector would start 8 + (256 − 8) × 5/8 = 163 GC threads per shard,
+and the JIT up to 36 compiler threads, thousands of threads over 64 shards
+contending for 64 CPUs at every collection. The simulation is
+single-threaded, so the serial collector (no GC threads) and a processor
+count of one (two JIT threads) fit it; `-Xms` = `-Xmx` gives every shard the
+same heap layout whatever the node's memory, which is what makes the laptop
+measurement below hold on the cluster. None of this changes a result: no
+decision depends on the collector or on thread counts. Measured on the laptop
+with these options (tie1's settings, N = 240, 4 runs, 2 November 2026): 114
+young collections paused the shard for 0.59 s in 475 s (0.1 %), with about
+8 MB live after each; at N = 480 (`main` and `paired`, 1g) 635 and 469
+collections took 0.50 and 0.44 s in total, none of them a full collection.
+The serial collector costs no measurable time.
+
+**Memory.** No exploratory run recorded memory, so it was measured on the
+laptop with the cluster's JVM options (2 November 2026). The young generation
+is a third of the fixed heap (eden 273 MB at 1g, 546 MB at 2g), touched
+within the first minute; the old generation slowly fills with what finished
+runs leave behind (about 1 MB per run at N = 240) until a full collection
+clears it, so over a long batch a shard can come to hold its whole heap.
+Outside the heap a shard needed less than 0.1 GB. Peak working sets: 371 MB
+(`main`'s options, N = 480, 1g), 374 MB (`paired`, N = 480, 1g), 645 MB
+(`tie1`, N = 240, 2g, 4 runs), each about 300 or 590 MB of touched heap plus
+the JVM itself. Hence 1.5 GB per 1g shard (1.1 GB at most, plus a margin)
+and 2.5 GB per 2g shard of the tie batches (2.1 GB at most): `--mem=96G` for
+64 shards, `160G` for the tie batches, `24G` for `exa80`'s 16. The tie batches keep the
+mechanism launch's `--heap 2g`; they would fit in 1g (8 MB live), which would
+halve their `--mem` if a node cannot give 160G.
+
+**Projections** (alpha ~ U[0, 0.9]). From the exploratory batch's shard-seconds
+per run on leost (7 shards; `exploratory_diagnostics.md`, R6: N = 80 … 480
+take 1.6, 10.1, 36, 91, 185, 346 s in `EX-A`), scaled up by the rounds a run
+lasts at α ≤ 0.9 against α ≤ 1 (+1.4 % to +3.8 % by N and arm: the runs above
+0.9 are short, their networks fall apart; taken in full, an upper bound), and
+placed on 64 shards with `run-batch.sh`'s own allocation. *f* is a cluster
+CPU's time per run over a leost shard's; it is not known before `exa80`.
+
+| batch | leost core-hours | wall, 64 shards, f = 1 | f = 2 | `--time` (f = 2 × 1.5) | `.tgz` | on disk |
+|---|---|---|---|---|---|---|
+| `main` | 1,921 | 32 h | 64 h | 97 h | ~120 MB | ~1.6 GB |
+| `w0` | 2,004 | 34 h | 69 h | 104 h | ~120 MB | ~1.5 GB |
+| `paired` | 1,974 | 34 h | 68 h | 102 h | ~150 MB | ~2.8 GB |
+| `tie1` | 51 | 0.8 h | 1.6 h | 3 h | ~100 MB | ~1.2 GB |
+| `tie2` | 47 | 0.7 h | 1.5 h | 3 h | ~110 MB | ~1.3 GB |
+| `exa80` | 0.1 | 1 min | 2 min | 15 min (16 CPUs) | < 1 MB | |
+
+Five batches: about 6,000 leost core-hours (5,836 at α ~ U[0, 1]), about 4.2
+days one after the other at f = 1 and 8.5 days at f = 2. The slowest shard
+is one at N = 480 (31 shards of 322–323 runs); the mean shard needs 7 % less.
+On leost's figures `--cost-exp 3.3` would save about 1 h (3 %) per large
+batch; `final.sh` keeps `run-batch.sh`'s 3.1, as the exploratory batch did,
+since a cluster CPU need not scale with N as leost's did. Output
+sizes are scaled from the exploratory archives (`main`, `w0`, `paired`) and
+from M1 and M2 (`tie1`, `tie2`); "on disk" counts `work/` and `split/`,
+about twice the data.
+
+**Calibrating with `exa80`.** Its log lists every shard's elapsed time;
+`EX-A` took 1.6 shard-seconds per run at N = 80 on leost, so
+f = (mean elapsed ÷ runs per shard) ÷ 1.6 s. The `--time` values above hold
+for f up to 3 (they assume f = 2 with a margin of 1.5); for a larger f, set
+`--time` to at least 1.5 × f × the f = 1 wall time before submitting.
+`exa80`'s runs themselves (300 at N = 80, the `EX-A` design) are for the
+comparison with `EX-A`'s 300 runs at N = 80.
+
+**Measured (3 Nov 2026): f = 1.25** (exa80: 2.0 s per run at N = 80). At that
+speed, with rounds per run from the exploratory round summaries (zeta = 30
+adds 20 per run; the stage after the outbreak stays 10, S11b):
+
+| batch, 64 CPUs | zeta 10: wall / CPU-hours | zeta 30: wall / CPU-hours |
+|---|---|---|
+| `main` | 40 h / 2,400 | 60 h / 3,570 |
+| `w0` | 43 h / 2,510 | 64 h / 3,730 |
+| `paired` | 42 h / 2,470 | 53 h / 3,120 |
+| `tie1`, `tie2` | 1.0 h, 0.9 h | 1.5 h, 1.4 h |
+| all five, one after another | 5.3 days | 7.5 days |
+
+`robust` with all runs: 11.1 h at 64 CPUs (the three N = 480 cells 62 %):
+N = 80 cells 0.2 / 0.2 / 0.3 h (A / B / C), N = 240 1.0 / 1.0 / 1.5 h,
+N = 480 2.0 / 2.0 / 3.0 h. 5.6 h at 128 CPUs, 4.0 h at 192, 2.8 h at 256; at
+64 CPUs `--runs-factor 0.5` gives 5.6 h, `0.35` 4.1 h.
+
 ## Published configuration
 
 Recovered from `40_simulation.tex` Table 1 unless noted. Independently confirmed
@@ -462,8 +753,8 @@ Burn-in source: `50_analysis.tex:5`, `60_results.tex:18`, `APP_A:73,96`.
 
 ### Deltas from the committed `config.properties`
 
-The config as inherited was post-preprint exploration (`c281878` onwards), not
-the published design. These are now fixed in `config.properties` itself, so the
+The config as inherited (`c281878` onwards) held exploration settings, not the
+design of Table 1. These are now fixed in `config.properties` itself, so the
 corresponding flags are no longer load-bearing — every one of them defaulted to
 empty in `run-batch.sh`, and a forgotten flag diverged from Table 1 silently.
 
@@ -497,28 +788,6 @@ the choice is low-risk either way — measured at N=480, 40 runs per arm, the tw
 regimes are statistically indistinguishable (disconnected 22.5% vs 32.5%,
 z=1.00, p=0.32; mean degree 7.69 vs 7.82). Agents converge to the ~8-tie optimum
 regardless; extra candidates only speed convergence to the same structure.
-
-**The preprint batch also had 16 encounters at every N** (resolved 14 Oct 2026).
-Earlier versions of this README, the Run A comment and Appendix B.4 of the
-manuscript said the preprint used a flat `nb.phi = 0.20` (16 → 96 encounters).
-The only basis for that was the inherited `config.properties`, which covers
-N = 80 alone. The preprint data contradict it. Per agent and epidemic step
-(`net.dynamic.ties.*.epidemic / (N × duration)`), its tie requests, acceptances
-and dissolutions match Run A within 2.5 % at every N:
-
-| N | encounters at flat 0.20 | requests ratio | acceptances ratio | dissolutions ratio |
-|---|---|---|---|---|
-| 80 | 16 | 1.000 | 0.999 | 0.999 |
-| 160 | 32 | 1.000 | 0.998 | 0.999 |
-| 240 | 48 | 1.002 | 1.004 | 1.004 |
-| 320 | 64 | 0.999 | 0.998 | 0.999 |
-| 400 | 80 | 1.008 | 1.024 | 1.023 |
-| 480 | 96 | 0.994 | 0.998 | 0.998 |
-
-Hendrik Nunner confirmed on 14 Oct 2026 that the preprint runs used 16
-encounters per agent and time step at every N. The manuscript's
-encounter-volume argument was withdrawn the same day. Size and contact
-volume were never confounded between the preprint and Runs A/B.
 
 ## Why it shards
 
@@ -590,27 +859,81 @@ A further trim is available but low value: `net.betweenness.pre.epidemic.av`,
 rather than per round — worth roughly 7% at N=320, against a change to the main
 summary schema.
 
+## Fixes on `rerun-fixes`
+
+Decision 30 Oct 2026: every batch is re-run with all known code fixes, one
+commit per fix so that each can be verified on its own. Every batch up to
+October 2026 (Runs A and B, Phase 3, the mechanism run, the bug check) was
+generated without them.
+
+- **An infected agent's disease cost is σ** (manuscript Eq. 5). Before,
+  `UtilityFunction.getDiseaseCosts` returned σ for an infected agent and
+  `NunnerBuskens.getDiseaseCosts` weighted it by d and set the global term to
+  0, so the cost was d·σ. That cost does not depend on the agent's ties, so
+  both definitions should take the same tie decisions; none of the batch CSVs
+  reports utilities. `--check-infected-cost` (key `check.infected.cost`,
+  default `false`; `batch-info.txt` records `shadow check : …`) tests this
+  decision by decision: every comparison of overall utilities that decides a
+  tie for an infected agent — its request (`Agent.newConnectionValuable`), its
+  acceptance of a request (`Agent.connectTo`), its cut
+  (`Agent.existingConnectionTooCostly`) — is evaluated a second time with
+  d·σ. `simulation-summary.csv` then ends with `check.infected.cost.n`
+  (comparisons) and `check.infected.cost.diff` (comparisons whose outcome
+  differs), and each differing comparison is logged to `shard.log` (WARN,
+  both utilities and both outcomes). The check reuses the utilities the
+  decision was taken on: it changes no decision and draws no random numbers.
+- **The paired design's adapting arm starts from the network the frozen arm
+  started from** (`--ep-structure both`). Before, agents revised their ties in
+  the round in which the frozen outbreak ended (see Phase 3 → Purpose), and the
+  adapting arm started from that network. The generator now records the tie
+  list right after the burn-in and, after the frozen arm, restores exactly
+  that list (`Network.restoreTies`: removes the ties not in it, adds the
+  missing ones; no utility evaluations, no random numbers; `shard.log` logs how
+  many ties each restore removed and added). Disease states are reset as
+  before and the index case stays the same agent. `simulation-summary.csv`
+  ends with `paired.start.identical` (BOTH batches only): `true` when the
+  SHA-256 of the canonical edge list is the same at the start of both arms.
+- **The random-others pool excludes second-degree neighbours**
+  (`Agent.java:1087`; see "Known divergences" below):
+  `allAgentsShuffled.removeAll(distance2AgentsShuffled)` instead of
+  `allAgentsAssorted.removeAll(…)`, as on the test branch `bugfix-1087-test`
+  (bug check S6), with its unit test `AgentDecisionPoolTest` (the random-others
+  pool contains neither direct contacts nor second-degree neighbours; the
+  assorted pools are unchanged).
+- **Edge ids with a separator; ties looked up by adjacency** (present in every
+  batch with N ≥ 112 up to October 2026). An edge id was the two agent ids
+  concatenated without a separator, so from N = 112 on two pairs could share
+  one: (d, xyz) and (dx, yz), e.g. 1-112 and 11-12 both gave `1112` (145
+  couples at N = 160, 486 at 240, 862 at 320, 1,269 at 400, 1,521 at 480; none
+  at N = 80). While one pair of a couple was tied, the other counted as tied
+  (`Agent.isDirectlyConnectedTo` looked the id up): its tie could not form, and
+  two neighbours of an agent that formed such a pair counted as a closed triad
+  in the utility (`StatsComputer.computeLocalAgentConnectionsStats`). Edge ids
+  are now `lower id-higher id` (`Agent.getEdgeId`), and every tie lookup goes
+  by adjacency (`hasEdgeBetween`, `getEdgeBetween`; `isDirectlyConnectedTo`,
+  `isConnectedToAtDistance2`, `addConnection`, `removeConnection`), so edges
+  read from DGS files with old ids still work. No CSV column changes (the CSVs
+  carry agent ids, never edge ids); edge ids in GEXF and DGS output now read
+  `a-b`. Unit test `AgentEdgeIdTest`.
+
 ## Known divergences from the manuscript algorithms
 
-- **`Agent.java` line 1076 (line 1086 since the explanatory comment block was
-  added on 8 Oct 2026) removes from the wrong list.** The statement reads
-  `allAgentsAssorted.removeAll(distance2AgentsShuffled);` where
-  `allAgentsShuffled.removeAll(distance2AgentsShuffled);` was evidently intended
-  (lines 1073-1075 build the shuffled pool; line 1071 already stripped the
-  distance-2 agents from the assorted one). Consequence: in the non-assorted
-  branch (`randOmega > omega`) the "random others" pool still contains
-  second-degree neighbours, while the assorted pool has them removed twice.
-  Effect: the effective ξ is slightly above 0.20 in the random branch, and the
-  encounter-set composition depends weakly on ω. Runs A and B (2 Sep 2026) and,
-  if inherited from `hnunner/nidm-simulation`, the preprint batch were generated
-  with this behaviour. Decision 8 Oct 2026: document, do not change, so that
-  Phase 3 stays comparable with Runs A and B. A matching comment sits above the
-  statement in `Agent.java`.
+- **`Agent.java` line 1087 removed from the wrong list — fixed on
+  `rerun-fixes`, present in every batch up to October 2026.** The statement
+  read `allAgentsAssorted.removeAll(distance2AgentsShuffled);` where
+  `allAgentsShuffled.removeAll(distance2AgentsShuffled);` was evidently
+  intended. Consequence: in the non-assorted branch (`randOmega > omega`) the
+  "random others" pool still contained second-degree neighbours, while the
+  assorted pool had them removed twice; the effective ξ was slightly above 0.20
+  in the random branch, and the encounter-set composition depended weakly on
+  ω. Runs A and B (2 Sep 2026), Phase 3 and the mechanism run were generated
+  with this behaviour (decision 8 Oct 2026: document, do not change; bug check S6 on
+  branch `bugfix-1087-test`, 27 Oct 2026). See "Fixes on `rerun-fixes`".
 - **Encounter categories are drawn per decision, not as up-front counts.** The
   code draws one category per network decision with probabilities ψ, ξ and
-  1−ψ−ξ (`randPsi` drawn at `Agent.java` 1101; branches at 1115, 1124 and
-  1134), without replacement, and a decision whose list is exhausted falls
-  through to the "all agents" pool (1134: `drawBase == null ||
+  1−ψ−ξ (`randPsi` drawn at `Agent.java` 1102; branches at 1116, 1125 and
+  1135), without replacement, and a decision whose list is exhausted falls
+  through to the "all agents" pool (1135: `drawBase == null ||
   drawBase.isEmpty() || …`). Manuscript Algorithm 5 (`30_model.tex` 160–184)
   draws n_neighs ~ Binomial(φ, ψ) and n_neighs² ~ Binomial(φ, ξ) up front,
   clamps them to the list lengths (the second also to φ − n_neighs) and gives
@@ -620,12 +943,33 @@ summary schema.
   then clamps, which at φ = 16, ψ = 0.4, ξ = 0.2 binds in 0.4 % of draws. Both
   route decisions an exhausted list cannot serve to the remaining agents. The
   pools differ: Algorithm 5's random pool excludes only the agent itself, the
-  code's excludes first- and second-degree neighbours (subject to the bug in
-  the previous bullet). Algorithm 5 line 184 also writes n_{n_1}, n_{n_2} for
-  n_neighs, n_neighs².
-- **`Agent.java` line 1123 (now 1134) duplicates a condition.** The test reads
+  code's excludes first- and second-degree neighbours (up to October 2026
+  subject to the bug in the previous bullet). Algorithm 5 line 184 also writes
+  n_{n_1}, n_{n_2} for n_neighs, n_neighs².
+- **`Agent.java` line 1123 (now 1135) duplicates a condition.** The test reads
   `(randPsi > psi+xi) && (randPsi > psi+xi)`; the second conjunct repeats the
   first. Harmless — it evaluates identically to the single condition.
+- **Code checks S10 (branch `code-checks`, 3 Nov 2026), three findings; all
+  three are identical in `origin/master`.**
+  - *Second-degree draw.* `Agent.getConnectionsAtDistance2()` lists a
+    friend of a friend once per shared friend, so the shuffled branch of
+    `computeRound` draws it in proportion to the shared friends (3–5 times as
+    likely for the most favoured; the sorted branch is not affected). Done:
+    switch `nb.fix.d2` (`run-batch.sh --fix-d2`), on in every final batch:
+    each one is a candidate once.
+  - *Agent order.* `Simulation.computeAgentDynamics()` shuffles the agents and
+    then takes them from `HashSet`s, which iterate by identity hash, so the
+    order is nearly the same in every round of a run (and repeats across
+    JVMs). Done: switch `nb.fix.order` (`--fix-order`), on in every final
+    batch: the next agent is drawn at random from the waiting contacts of
+    processed agents, or, if none wait, from all agents not yet processed.
+  - *Burn-in.* The stability check is switched off (`Network.java`, "XXX
+    STABILITY COMPUTATION TURNED OFF"), so the burn-in is always exactly zeta
+    = 10 steps and no network is pairwise stable after it. Done: zeta of the
+    final batches is set by the robustness batch (`robust`, rule B of
+    `robustness_criteria.md`: 10 or 30); the stage after each outbreak stays
+    10 rounds (`nb.zeta.post`, S11b); stability is still not tested.
+  Every batch up to S11 ran with both switches off (as `3e4e86d`).
 
 ## Open
 

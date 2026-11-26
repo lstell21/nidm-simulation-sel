@@ -64,6 +64,7 @@ import nl.uu.socnetid.nidm.stats.NetworkStats;
 import nl.uu.socnetid.nidm.stats.NetworkStatsPost;
 import nl.uu.socnetid.nidm.stats.NetworkStatsPre;
 import nl.uu.socnetid.nidm.system.PropertiesHandler;
+import nl.uu.socnetid.nidm.utility.InfectedCostCheck;
 import nl.uu.socnetid.nidm.utility.NunnerBuskens;
 import nl.uu.socnetid.nidm.utility.UtilityFunction;
 
@@ -92,6 +93,8 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
     private GEXFWriter gexfWriter;
     // tie-level output (export.tie.events); null when off
     private TieEventLog tieEventLog;
+    // shadow check of the infected agents' disease cost (check.infected.cost); null when off
+    private InfectedCostCheck infectedCostCheck;
 
 
     /**
@@ -147,6 +150,10 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
         // tie events and transmissions during active epidemics
         if (PropertiesHandler.getInstance().isExportTieEvents()) {
             this.tieEventLog = new TieEventLog(getExportPath(), this.dgData);
+        }
+        // shadow check of the infected agents' disease cost (two summary columns)
+        if (PropertiesHandler.getInstance().isCheckInfectedCost()) {
+            this.infectedCostCheck = new InfectedCostCheck();
         }
     }
 
@@ -431,6 +438,13 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             if (this.tieEventLog != null) {
                 this.tieEventLog.attach(this.network);
             }
+            if (this.infectedCostCheck != null) {
+                this.infectedCostCheck.reset();
+                this.network.setInfectedCostCheck(this.infectedCostCheck);
+            }
+            // corrections of the code checks S10 (nb.fix.order, nb.fix.d2; off: the code as before)
+            this.network.setFixOrder(PropertiesHandler.getInstance().isFixOrder());
+            this.network.setFixD2(PropertiesHandler.getInstance().isFixD2());
 
             // begin: GEXF export
             if (PropertiesHandler.getInstance().isExportGexf()) {
@@ -474,12 +488,21 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             if (ump.getEpStructure() == EpidemicStructures.BOTH) {
                 ump.setCurrEpStructure(EpidemicStructures.STATIC);
                 this.simulatePreEpidemic();
+                // the network both arms start from
+                List<long[]> preEpidemicTies = this.network.getTies();
+                String startHashStatic = this.network.getEdgeListHash();
                 this.simulateEpidemic(ds, indexCase, true);
                 // write agent data
                 if (PropertiesHandler.getInstance().isExportAgentDetails() ||
                         PropertiesHandler.getInstance().isExportAgentDetailsReduced()) {
                             this.adWriter.writeCurrentData();
                 }
+                // agents revise their ties in the round in which the frozen outbreak ends
+                // (Simulation.computeSingleRound), so the adapting arm would start from a slightly
+                // different network: restore the ties (no utilities, no random numbers)
+                this.network.restoreTies(preEpidemicTies);
+                this.dgData.getSimStats().setPairedStartIdentical(
+                        startHashStatic.equals(this.network.getEdgeListHash()));
                 ump.setCurrEpStructure(EpidemicStructures.DYNAMIC);
                 this.simulateEpidemic(ds, indexCase, false);
                 this.simulatePostEpidemic();
@@ -492,6 +515,10 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
             }
 
             // write summary data
+            if (this.infectedCostCheck != null) {
+                this.dgData.getSimStats().setCheckInfectedCost(this.infectedCostCheck.getN(),
+                        this.infectedCostCheck.getDiff());
+            }
             if (PropertiesHandler.getInstance().isExportSummary()) {
                 this.ssWriter.writeCurrentData();
             }
@@ -545,8 +572,8 @@ public class NunnerBuskensDataGenerator extends AbstractDataGenerator implements
         this.simulation = new Simulation(network, isEpStatic);
         this.simulation.addSimulationListener(this);
 
-        // simulate
-        this.simulation.simulateUntilStable(this.dgData.getUtilityModelParams().getZeta());
+        // simulate: nb.zeta.post rounds (S11b; as nb.zeta when the key is absent)
+        this.simulation.simulateUntilStable(this.dgData.getUtilityModelParams().getZetaPost());
     }
 
     /**

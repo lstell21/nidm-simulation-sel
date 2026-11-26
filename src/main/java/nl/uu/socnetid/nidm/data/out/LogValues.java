@@ -244,6 +244,7 @@ public enum LogValues {
     IV_NB_SELECTIVE_RANDOM("nb.selective.random"),
     IV_NB_SELECTIVE("nb.selective"),
     IV_NB_ZETA("nb.zeta"),
+    IV_NB_ZETA_POST("nb.zeta.post"),
     IV_NB_EPSILON("nb.epsilon"),
     IV_NB_SIMS_PER_PC("nb.n"),
     IV_NB_SIM_ITERATIONS("nb.m"),
@@ -570,6 +571,16 @@ public enum LogValues {
     DV_INDEX_DYNAMIC_CONS_IN_DECLINED("index.dynamic.cons.in.declined"),
     DV_INDEX_DYNAMIC_R_SIGMA("index.dynamic.r.sigma"),
     DV_INDEX_DYNAMIC_R_PI("index.dynamic.r.pi"),
+
+    // CHECKS
+    // shadow check of the infected agents' disease cost (check.infected.cost=true only)
+    DV_CHECK_INFECTED_COST_N("check.infected.cost.n"),
+    DV_CHECK_INFECTED_COST_DIFF("check.infected.cost.diff"),
+    // paired design (nb.ep.structure=both only): both arms started from the same edge list
+    DV_PAIRED_START_IDENTICAL("paired.start.identical"),
+    // corrections of the code checks S10 (every run; false: the code as before S11)
+    IV_NB_FIX_ORDER("nb.fix.order"),
+    IV_NB_FIX_D2("nb.fix.d2"),
 
     // OTHERS
     EXPORT_FILENAME("export.filename"),

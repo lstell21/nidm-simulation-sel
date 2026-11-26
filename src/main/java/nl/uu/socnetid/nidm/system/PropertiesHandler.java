@@ -123,6 +123,11 @@ public class PropertiesHandler {
     private boolean exportAgentDetailsReduced;
     private boolean exportGexf;
     private boolean exportTieEvents;
+    // shadow check of the infected agents' disease cost
+    private boolean checkInfectedCost;
+    // corrections of the code checks S10 (switches, off by default)
+    private boolean fixOrder;
+    private boolean fixD2;
     // data analysis?
     private boolean analyzeData;
 
@@ -452,6 +457,11 @@ public class PropertiesHandler {
         nbParameters.setSelectives(parseBooleanArray(configProps.getProperty(LogValues.IV_NB_SELECTIVE.toString())));
         // time steps
         nbParameters.setZeta(Integer.valueOf(configProps.getProperty(LogValues.IV_NB_ZETA.toString())));
+        // rounds after an outbreak (S11b); absent: as nb.zeta, so existing configs run as before
+        String zetaPost = configProps.getProperty(LogValues.IV_NB_ZETA_POST.toString());
+        if (zetaPost != null && !zetaPost.trim().isEmpty()) {
+            nbParameters.setZetaPost(Integer.valueOf(zetaPost.trim()));
+        }
         nbParameters.setEpsilon(Integer.valueOf(configProps.getProperty(LogValues.IV_NB_EPSILON.toString())));
         nbParameters.setTaus(parseIntArray(configProps.getProperty(LogValues.IV_NB_TAU.toString())));
         // n
@@ -549,6 +559,11 @@ public class PropertiesHandler {
         this.exportGexf = Boolean.parseBoolean(configProps.getProperty("export.gexf"));
         // defaults to false when absent, so existing configs produce exactly the existing output
         this.exportTieEvents = Boolean.parseBoolean(configProps.getProperty("export.tie.events", "false"));
+        // defaults to false when absent; adds two summary columns when on, changes no decision
+        this.checkInfectedCost = Boolean.parseBoolean(configProps.getProperty("check.infected.cost", "false"));
+        // S10 corrections; default false when absent, so existing configs run the code as before
+        this.fixOrder = Boolean.parseBoolean(configProps.getProperty("nb.fix.order", "false"));
+        this.fixD2 = Boolean.parseBoolean(configProps.getProperty("nb.fix.d2", "false"));
 
         // analyze data?
         this.analyzeData = Boolean.parseBoolean(configProps.getProperty("analyze.data"));
@@ -734,6 +749,36 @@ public class PropertiesHandler {
      */
     public boolean isExportTieEvents() {
         return exportTieEvents;
+    }
+
+    /**
+     * Whether every tie decision of an infected agent is evaluated a second time with the disease
+     * cost before rerun-fixes, d * sigma (see InfectedCostCheck).
+     *
+     * @return the checkInfectedCost
+     */
+    public boolean isCheckInfectedCost() {
+        return checkInfectedCost;
+    }
+
+    /**
+     * Whether agents act in a random order in every round (nb.fix.order; see
+     * Simulation.computeAgentDynamics()).
+     *
+     * @return the fixOrder
+     */
+    public boolean isFixOrder() {
+        return fixOrder;
+    }
+
+    /**
+     * Whether each second-degree neighbour is a candidate once, not once per shared neighbour
+     * (nb.fix.d2; see Agent.computeRound()).
+     *
+     * @return the fixD2
+     */
+    public boolean isFixD2() {
+        return fixD2;
     }
 
     /**
