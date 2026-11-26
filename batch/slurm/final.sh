@@ -82,7 +82,7 @@ $usage" ;;
     esac
 done
 
-# The batches. Options as in exploratory.sh and the mechanism launch (MECHANISM_REPORT.md, 5).
+# The batches. Options as in exploratory.sh and the mechanism run (batch/README.md, "Tie-level output").
 COMMON="--encounters 16 --no-centralities"
 # decided 3 Nov 2026 (robustness_criteria.md, D1 and D2): every final batch
 FIXES="--fix-order --fix-d2"

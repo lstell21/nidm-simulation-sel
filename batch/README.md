@@ -155,7 +155,7 @@ hidden Windows process (`powershell Start-Process -WindowStyle Hidden`), with
 its own console, so neither Ctrl-C nor closing the launch window should reach
 it. Elsewhere it uses `setsid`. `DETACH=0` restores the old attached launch,
 and the script then warns that Ctrl-C kills the run. **Not yet verified with a
-real Ctrl-C** (it cannot be tested from inside a Claude Code session). Test it
+real Ctrl-C** (it cannot be tested from a script). Test it
 once, with nothing else running, before relying on it:
 
 ```sh
@@ -224,16 +224,10 @@ selectively, inside one network rather than across independent draws.
 γ is narrowed to U[0.1, 0.2] because the α × γ interaction the paper has to
 explain lives at low γ; 10,000 outbreaks per N inside that band give three
 times the density Run A has there. α stays U[0, 1] because that interaction is
-read along α, and its shape depends on the model it is read through. The
-preprint's linear α × γ specification (Figure 3c) gives a γ = 0.1 curve that
-rises from ~0.16 at α = 0 to ~0.32 at α = 1 and crosses the other γ curves near
-α ≈ 0.87 (the reading recorded here on 28 Aug 2026). The current manuscript's
-spline model and binned estimates (Figure 5(c), Figure 8, Appendix Fig. B.8)
-show instead a peak at α ≈ 0.4–0.5 for γ ≤ 0.25 (binned, γ 0.10–0.15:
-17.0 % → 37.6 % → 7.0 %). The design decision is the same under both: γ in
-[0.1, 0.2] with α left at U[0, 1] — the α ~ U[0, 0.3] first planned would miss
-the high-α crossover of the one reading and the peak and decline of the other.
-Phase 3 then measures the shape directly: the static arm traces outbreak size
+read along α: the manuscript's spline model and binned estimates (Figure 5(c),
+Figure 8, Appendix Fig. B.8) show a peak at α ≈ 0.4–0.5 for γ ≤ 0.25 (binned,
+γ 0.10–0.15: 17.0 % → 37.6 % → 7.0 %), and the α ~ U[0, 0.3] first planned
+would miss the peak and its decline. Phase 3 then measures the shape directly: the static arm traces outbreak size
 along α with no contact adaptation, on the pre-epidemic networks the dynamic
 arm starts from (up to the one revision round described above).
 ω stays random (as Run A) so the ω gradient can be re-read with the static
@@ -373,7 +367,7 @@ random, γ ~ U[0.1, 0.2], α ~ U[0, 0.9], 16 encounters, `--fix-order
 ## Exploratory batch (`exploratory.sh`, before the re-run)
 
 Design diagnostics before the final re-run batches; design and rules are fixed
-in `exploratory_criteria.md` (Claude Science, 30 Oct 2026, section 2). The
+in `exploratory_criteria.md` (30 Oct 2026, section 2). The
 data may be used only for the diagnostics listed there, never for a result.
 `batch/exploratory.sh` runs the three arms one after the other with
 `run-batch.sh`, from the `rerun-fixes` build it makes itself:
@@ -759,8 +753,8 @@ Burn-in source: `50_analysis.tex:5`, `60_results.tex:18`, `APP_A:73,96`.
 
 ### Deltas from the committed `config.properties`
 
-The config as inherited was post-preprint exploration (`c281878` onwards), not
-the published design. These are now fixed in `config.properties` itself, so the
+The config as inherited (`c281878` onwards) held exploration settings, not the
+design of Table 1. These are now fixed in `config.properties` itself, so the
 corresponding flags are no longer load-bearing — every one of them defaulted to
 empty in `run-batch.sh`, and a forgotten flag diverged from Table 1 silently.
 
@@ -794,28 +788,6 @@ the choice is low-risk either way — measured at N=480, 40 runs per arm, the tw
 regimes are statistically indistinguishable (disconnected 22.5% vs 32.5%,
 z=1.00, p=0.32; mean degree 7.69 vs 7.82). Agents converge to the ~8-tie optimum
 regardless; extra candidates only speed convergence to the same structure.
-
-**The preprint batch also had 16 encounters at every N** (resolved 14 Oct 2026).
-Earlier versions of this README, the Run A comment and Appendix B.4 of the
-manuscript said the preprint used a flat `nb.phi = 0.20` (16 → 96 encounters).
-The only basis for that was the inherited `config.properties`, which covers
-N = 80 alone. The preprint data contradict it. Per agent and epidemic step
-(`net.dynamic.ties.*.epidemic / (N × duration)`), its tie requests, acceptances
-and dissolutions match Run A within 2.5 % at every N:
-
-| N | encounters at flat 0.20 | requests ratio | acceptances ratio | dissolutions ratio |
-|---|---|---|---|---|
-| 80 | 16 | 1.000 | 0.999 | 0.999 |
-| 160 | 32 | 1.000 | 0.998 | 0.999 |
-| 240 | 48 | 1.002 | 1.004 | 1.004 |
-| 320 | 64 | 0.999 | 0.998 | 0.999 |
-| 400 | 80 | 1.008 | 1.024 | 1.023 |
-| 480 | 96 | 0.994 | 0.998 | 0.998 |
-
-Hendrik Nunner confirmed on 14 Oct 2026 that the preprint runs used 16
-encounters per agent and time step at every N. The manuscript's
-encounter-volume argument was withdrawn the same day. Size and contact
-volume were never confounded between the preprint and Runs A/B.
 
 ## Why it shards
 
@@ -954,9 +926,8 @@ generated without them.
   "random others" pool still contained second-degree neighbours, while the
   assorted pool had them removed twice; the effective ξ was slightly above 0.20
   in the random branch, and the encounter-set composition depended weakly on
-  ω. Runs A and B (2 Sep 2026), Phase 3, the mechanism run and, if inherited
-  from `hnunner/nidm-simulation`, the preprint batch were generated with this
-  behaviour (decision 8 Oct 2026: document, do not change; bug check S6 on
+  ω. Runs A and B (2 Sep 2026), Phase 3 and the mechanism run were generated
+  with this behaviour (decision 8 Oct 2026: document, do not change; bug check S6 on
   branch `bugfix-1087-test`, 27 Oct 2026). See "Fixes on `rerun-fixes`".
 - **Encounter categories are drawn per decision, not as up-front counts.** The
   code draws one category per network decision with probabilities ψ, ξ and

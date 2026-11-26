@@ -1,6 +1,6 @@
 #!/bin/sh
 # Exploratory batch (S8, 30 Oct 2026): design diagnostics before the final re-run batches.
-# Design and rules, fixed before any run: exploratory_criteria.md (Claude Science, 30 Oct 2026;
+# Design and rules, fixed before any run: exploratory_criteria.md (30 Oct 2026;
 # selcor-handoff), section 2. Three arms, one after the other, from the rerun-fixes build:
 #   EX-A  main design                     300 runs per N    --omega-random
 #   EX-B  omega = 0                       150 runs per N    --omega 0

@@ -11,8 +11,8 @@
 #
 # so a config holding the whole grid (nb.N=80,160,...) yields as.numeric of a
 # comma string -- NA for every row, silently. Each shard therefore gets exactly
-# one N value, which is also how the preprint's data was produced (the pipeline's
-# MERGE_ROOT_DIR is ./data/split, one directory per run).
+# one N value (the pipeline's MERGE_ROOT_DIR is ./data/split, one directory per
+# run).
 #
 # WHY SHARDS ARE ALLOCATED UNEVENLY:
 # Cost grows as roughly N^2.9, so one replication at N=480 costs ~300x one at

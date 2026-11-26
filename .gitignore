@@ -45,3 +45,5 @@ batch-runs/
 dist/
 # stray R plots
 Rplots.pdf
+# internal working documents, not part of the release
+notes-internal/

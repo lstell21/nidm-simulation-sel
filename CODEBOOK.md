@@ -1,6 +1,6 @@
 # Codebook of the simulation output
 
-Prepared by Claude Science (task S13, 13 November 2026). It describes the CSV files that the final
+Prepared by Claude Science (13 November 2026, updated 26 November 2026). It describes the CSV files that the final
 build writes: commit `70dcf43` on branch `rerun-fixes`, batch jar SHA-256 `c4759c0d…`, bundle
 `selcor-final-70dcf43`. The data deposit holds the output of the final batches `main`, `w0`,
 `tie1` and `tie2`, and of the recording check. Every column below was taken from that output, in
