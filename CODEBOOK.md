@@ -3,8 +3,8 @@
 Prepared by Claude Science (task S13, 13 November 2026). It describes the CSV files that the final
 build writes: commit `70dcf43` on branch `rerun-fixes`, batch jar SHA-256 `c4759c0d…`, bundle
 `selcor-final-70dcf43`. The data deposit holds the output of the final batches `main`, `w0`,
-`paired`, `tie1` and `tie2`, and of the recording check. Every column below was taken from that
-output, in file order, and checked against the code that writes it.
+`tie1` and `tie2`, and of the recording check. Every column below was taken from that output, in
+file order, and checked against the code that writes it.
 
 Sources are given as file:line at `70dcf43`, with these abbreviations (all under
 `src/main/java/nl/uu/socnetid/nidm/`):
@@ -36,8 +36,8 @@ made of rounds (time steps):
 In the paired design (`nb.ep.structure` = `both`) the same network and index case go through two
 outbreaks. First comes the frozen arm, in which ties do not change during the outbreak
 (`static`). Then the network is reset to the tie list it had at the start of that outbreak, and
-the adapting arm runs (`dynamic`), followed by the stage after the outbreak. The other final
-batches run only the adapting arm.
+the adapting arm runs (`dynamic`), followed by the stage after the outbreak. None of the
+deposited batches uses the paired design: all of them are `dynamic` and run only the adapting arm.
 
 Rounds are counted over the whole run, starting at 1 with the first burn-in round. The same
 numbering appears in `round-summary.csv`, `tie-events.csv` and `transmissions.csv`
@@ -102,25 +102,26 @@ config.properties.source
 - **Logical values:** `true` or `false`, except `net.stable.pre` and `nb.rs.equal`, which are
   `1` or `0`.
 - **Missing values:**
-  - `NA` where a column does not apply: the eleven `net.static.*` columns outside the paired
+  - `NA` where a column does not apply: the eleven `net.static.*` columns in every deposited
     batch, `distance.after` for form events, and the infector columns if an infection had no
     infected neighbour (does not occur).
   - `NaN` where a computation is undefined: a correlation without variance, or a mean over no
     neighbours. None occurred in the files checked for this codebook.
 - **Keys:** `sim.uid` is unique only within one shard folder. A run is identified by shard folder
   and `sim.uid`. Within a shard, `sim.cnt` numbers the runs 1, 2, …
-- **Constant columns:** columns that are constant in the final batches are marked "constant" in
-  the tables. Section 7 lists them, with the columns the final batches do not use.
+- **Constant columns:** columns that are constant in the deposited batches are marked "constant"
+  in the tables. Section 7 lists them, with the columns the deposited batches do not use.
 
 ## 3. `simulation-summary.csv`
 
-One row per run, written when the run is complete (GEN:523). The paired batch has 58 columns;
-the other batches have 57, without `paired.start.identical`.
+One row per run, written when the run is complete (GEN:523). 57 columns in every deposited batch.
 
 - **"At the start of the outbreak":** after the burn-in and the infection of the index case,
   before the first outbreak round (GEN:585-589).
 - **"Frozen arm" and "adapting arm":** the paired design's two outbreaks (Section 1). The
-  `net.static.*` columns describe the frozen arm, the `net.dynamic.*` columns the adapting arm.
+  `net.dynamic.*` columns describe the outbreak of the deposited batches (the adapting arm). The
+  `net.static.*` columns would describe a frozen arm; no deposited batch has one, so they are
+  `NA`.
 
 | # | column | meaning | type, unit | symbol | source |
 |---|---|---|---|---|---|
@@ -128,13 +129,13 @@ the other batches have 57, without `paired.start.identical`.
 | 2 | `sim.upc` | Number of the parameter combination. Every parameter that varies is drawn per run, so this is 1 in every run. Constant. | count | | SSR:167 |
 | 3 | `sim.cnt` | Number of the run within the shard (1, 2, …). | count | | SSR:168 |
 | 4 | `sim.it` | Repetition of the same drawn parameters; 1 in every run. Constant. | count | | SSR:169 |
-| 5 | `nb.ep.structure` | Design: `dynamic` (adapting arm only: main, w0, tie1, tie2) or `both` (paired: frozen arm, then adapting arm). Constant within a batch. | text | | SSR:171 |
+| 5 | `nb.ep.structure` | Design: `dynamic` (adapting arm only) in every deposited batch. The code also has `both`, the paired design (Section 1), which no deposited batch uses. Constant. | text | | SSR:171 |
 | 6 | `nb.alpha` | Preferred proportion of closed triads, drawn per run, U[0, 0.9]. | 0–1 | α | SSR:173 |
 | 7 | `nb.omega` | Likelihood that an encounter is drawn by similarity in risk perception, drawn per run, U[0, 1]; 0 in w0 and tie2. | 0–1 | ω | SSR:174 |
 | 8 | `nb.selective` | Whether the agents of this run are selective during an outbreak; drawn per run, Bernoulli(0.5), the same for all agents. | true/false | s | SSR:175 |
 | 9 | `nb.d` | Weight of local over global perceived infection risk, drawn per run, U[0, 1]. | 0–1 | d | SSR:176 |
 | 10 | `nb.sigma` | Disease severity, drawn per run, U[1, 3]. | ≥ 1 | σ | SSR:177 |
-| 11 | `nb.gamma` | Infectivity: transmission probability per contact and round, drawn per run; U[0.1, 0.4] in main, w0, tie2; U[0.1, 0.2] in paired, tie1. | 0–1 | γ | SSR:178 |
+| 11 | `nb.gamma` | Infectivity: transmission probability per contact and round, drawn per run; U[0.1, 0.4] in main, w0, tie2; U[0.1, 0.2] in tie1. | 0–1 | γ | SSR:178 |
 | 12 | `nb.r.min` | Smallest risk perception among the run's N agents. Each agent draws r from N(1.2237, 0.4625) truncated to [0.4474, 2.0]; perceived severity and perceived infectivity are equal (r_σ = r_π). | 0.45–2.0 | r | SSR:179 (GEN:421) |
 | 13 | `nb.r.max` | Largest risk perception among the run's agents. | 0.45–2.0 | r | SSR:180 (GEN:422) |
 | 14 | `nb.r.sigma.av` | Mean risk perception of the run's agents. | 0.45–2.0 | r | SSR:181 (GEN:424) |
@@ -156,21 +157,21 @@ the other batches have 57, without `paired.start.identical`.
 | 30 | `index.closeness` | Closeness of the index case at the start of the outbreak (as in column 19). | 0–1 | | SSR:201 |
 | 31 | `index.r.sigma` | Risk perception of the index case. | 0.45–2.0 | r | SSR:202 |
 | 32 | `index.r.sigma.neighborhood` | Mean risk perception of the index case's neighbours at the start of the outbreak. | 0.45–2.0 | r | SSR:203 (Agent.java:420) |
-| 33 | `net.static.pct.rec` | Frozen arm (paired only; `NA` elsewhere): share of agents recovered when the outbreak ended, i.e. the final outbreak size. | % of N | \|R\| | SSR:212 (NA: SSR:207-210) |
-| 34 | `net.static.pct.inf` | Frozen arm: share of agents infected when the outbreak ended. The outbreak ends when no agent is infected, so 0 in every run. Constant. | % of N | \|I\| | SSR:213 |
-| 35 | `net.static.epidemic.duration` | Frozen arm: number of outbreak rounds, from the first to the round in which the last infected agent recovered, inclusive (the `active-epidemic` rounds plus the `stopped-epidemic` round of the round summary). | rounds | | SSR:214 (GEN:769) |
-| 36 | `net.static.epidemic.peak` | Frozen arm: outbreak round (1 = first) with the most infected agents; the first such round if several tie. | round | | SSR:215 (GEN:723) |
-| 37 | `net.static.epidemic.peak.size` | Frozen arm: the number of infected agents in that round. | count | \|I\| | SSR:216 (GEN:722) |
-| 38 | `net.static.ties.broken.active.epidemic` | Frozen arm: ties cut while any agent was infected. Ties do not change during the frozen outbreak, so 0 in every run. Constant. | count | | SSR:233 |
-| 39 | `net.static.ties.broken.passive.epidemic` | Frozen arm: as column 50. 0 in every run. Constant. | count | | SSR:234 |
-| 40 | `net.static.ties.out.accepted.epidemic` | Frozen arm: as column 51. 0 in every run. Constant. | count | | SSR:235 |
-| 41 | `net.static.ties.out.declined.epidemic` | Frozen arm: as column 52. 0 in every run. Constant. | count | | SSR:236 |
-| 42 | `net.static.ties.in.accepted.epidemic` | Frozen arm: as column 53. 0 in every run. Constant. | count | | SSR:237 |
-| 43 | `net.static.ties.in.declined.epidemic` | Frozen arm: as column 54. 0 in every run. Constant. | count | | SSR:238 |
+| 33 | `net.static.pct.rec` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's share of agents recovered when its outbreak ended, i.e. its final outbreak size. | % of N | \|R\| | SSR:212 (NA: SSR:207-210) |
+| 34 | `net.static.pct.inf` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's share of agents infected when its outbreak ended (0, as column 45). | % of N | \|I\| | SSR:213 |
+| 35 | `net.static.epidemic.duration` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's outbreak duration, as column 46. | rounds | | SSR:214 (GEN:769) |
+| 36 | `net.static.epidemic.peak` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's peak round, as column 47. | round | | SSR:215 (GEN:723) |
+| 37 | `net.static.epidemic.peak.size` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's peak number of infected agents, as column 48. | count | \|I\| | SSR:216 (GEN:722) |
+| 38 | `net.static.ties.broken.active.epidemic` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's counter, as column 49; 0 there, because ties do not change during a frozen outbreak. | count | | SSR:233 |
+| 39 | `net.static.ties.broken.passive.epidemic` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's counter, as column 50; 0 there, because ties do not change during a frozen outbreak. | count | | SSR:234 |
+| 40 | `net.static.ties.out.accepted.epidemic` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's counter, as column 51; 0 there, because ties do not change during a frozen outbreak. | count | | SSR:235 |
+| 41 | `net.static.ties.out.declined.epidemic` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's counter, as column 52; 0 there, because ties do not change during a frozen outbreak. | count | | SSR:236 |
+| 42 | `net.static.ties.in.accepted.epidemic` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's counter, as column 53; 0 there, because ties do not change during a frozen outbreak. | count | | SSR:237 |
+| 43 | `net.static.ties.in.declined.epidemic` | `NA` in every deposited batch. In the paired design (Section 1) it holds the frozen arm's counter, as column 54; 0 there, because ties do not change during a frozen outbreak. | count | | SSR:238 |
 | 44 | `net.dynamic.pct.rec` | Adapting arm: share of agents recovered when the outbreak ended, i.e. the final outbreak size (every infected agent recovers). The analysis's outcome; an outbreak "takes off" above 10 %. | % of N | \|R\| | SSR:242 |
 | 45 | `net.dynamic.pct.inf` | Adapting arm: share infected when the outbreak ended: 0 in every run. Constant. | % of N | \|I\| | SSR:243 |
-| 46 | `net.dynamic.epidemic.duration` | Adapting arm: number of outbreak rounds, as column 35. | rounds | | SSR:244 (GEN:771) |
-| 47 | `net.dynamic.epidemic.peak` | Adapting arm: outbreak round with the most infected agents, as column 36. | round | | SSR:245 (GEN:730) |
+| 46 | `net.dynamic.epidemic.duration` | Adapting arm: number of outbreak rounds, from the first to the round in which the last infected agent recovered, inclusive (the `active-epidemic` rounds plus the `stopped-epidemic` round of the round summary). | rounds | | SSR:244 (GEN:771) |
+| 47 | `net.dynamic.epidemic.peak` | Adapting arm: outbreak round (1 = first) with the most infected agents; the first such round if several tie. | round | | SSR:245 (GEN:730) |
 | 48 | `net.dynamic.epidemic.peak.size` | Adapting arm: the number of infected agents in that round. | count | \|I\| | SSR:246 (GEN:729) |
 | 49 | `net.dynamic.ties.broken.active.epidemic` | Adapting arm: ties cut while any agent was infected, counted for the agent that cut them; i.e. the number of ties cut during the outbreak (Agent.java:964-970). | count | | SSR:263 |
 | 50 | `net.dynamic.ties.broken.passive.epidemic` | The same ties counted for the agent on the other end; equal to column 49 in every run (Agent.java:978-984). | count | | SSR:264 |
@@ -178,10 +179,9 @@ the other batches have 57, without `paired.start.identical`.
 | 52 | `net.dynamic.ties.out.declined.epidemic` | Tie requests sent and declined while any agent was infected (Agent.java:1006-1012). | count | | SSR:266 |
 | 53 | `net.dynamic.ties.in.accepted.epidemic` | Requests received and accepted; equal to column 51 in every run. | count | | SSR:267 |
 | 54 | `net.dynamic.ties.in.declined.epidemic` | Requests received and declined; equal to column 52 in every run. | count | | SSR:268 |
-| 55 | `paired.start.identical` | Paired batch only (the column is absent elsewhere): `true` if both arms started from the same network, compared by the SHA-256 of the canonical tie list, one "lower id-higher id" per tie (GEN:493, 503-505; Network.java `getEdgeListHash`). `true` in every run. Constant. | true/false | | SSR:278 |
-| 56 | `nb.fix.order` | `true`: agents act in a random order in every round (correction of code check S10). `true` in every final batch. Constant. | true/false | | SSR:281 |
-| 57 | `nb.fix.d2` | `true`: each second-degree neighbour is a candidate for an encounter once, not once per shared neighbour (correction of code check S10). `true` in every final batch. Constant. | true/false | | SSR:282 |
-| 58 | `nb.zeta.post` | Rounds of the stage after the outbreak: 10. The burn-in length (`nb.zeta`, 30) is in `config.properties` and `batch-info.txt`, not in this file. Constant. | rounds | | SSR:283 |
+| 55 | `nb.fix.order` | `true`: agents act in a random order in every round (correction of code check S10). `true` in every deposited batch. Constant. | true/false | | SSR:281 |
+| 56 | `nb.fix.d2` | `true`: each second-degree neighbour is a candidate for an encounter once, not once per shared neighbour (correction of code check S10). `true` in every deposited batch. Constant. | true/false | | SSR:282 |
+| 57 | `nb.zeta.post` | Rounds of the stage after the outbreak: 10. The burn-in length (`nb.zeta`, 30) is in `config.properties` and `batch-info.txt`, not in this file. Constant. | rounds | | SSR:283 |
 
 The six tie counters (columns 38–43 and 49–54) count events only while at least one agent is
 infected. Each event is counted once for each of the two agents, so "active" equals "passive",
@@ -201,7 +201,7 @@ One row per round of every stage of every run, written at the end of the round (
 | 3 | `sim.cnt` | Number of the run within the shard. | count | | RSW:142 |
 | 4 | `sim.it` | As in the summary: 1. Constant. | count | | RSW:143 |
 | 5 | `sim.round` | Round number, counted over the whole run from 1 (first burn-in round) across all stages. | round | | RSW:144 (GEN:713) |
-| 6 | `nb.ep.structure` | The arm the round belongs to: `dynamic`. In the paired batch, `static` for the burn-in and the frozen arm, and `dynamic` for the adapting arm and the stage after the outbreak. | text | | NBR:79 |
+| 6 | `nb.ep.structure` | The arm the round belongs to: `dynamic` in every round of every deposited batch. (In the paired design, which no deposited batch uses, the burn-in and the frozen arm are `static`.) | text | | NBR:79 |
 | 7 | `nb.alpha` | As in the summary. | 0–1 | α | NBR:80 |
 | 8 | `nb.sigma` | As in the summary. | ≥ 1 | σ | NBR:81 |
 | 9 | `nb.rs.equal` | 1 if perceived severity and perceived infectivity are equal for every agent (r_σ = r_π): 1. Constant. | 0/1 | | NBR:82 |
@@ -228,9 +228,8 @@ One row per round of every stage of every run, written at the end of the round (
 ## 5. `tie-events.csv`
 
 Written only when tie events are recorded (`export.tie.events=true`): in tie1, tie2 and the
-recording check (`on/`). One row per tie formed or cut while at least one agent was infected. In
-these batches that means the adapting arm's outbreak rounds; the frozen arm's ties do not change.
-Agent ids run from `1` to `N` within a run. 14 columns.
+recording check (`on/`). One row per tie formed or cut while at least one agent was infected, that
+is, in the outbreak rounds. Agent ids run from `1` to `N` within a run. 14 columns.
 
 | # | column | meaning | type, unit | symbol | source |
 |---|---|---|---|---|---|
@@ -271,21 +270,20 @@ Checks of these two files on the final build (batch/README.md, "Checked 5 Nov 20
 - dissolve events equal column 49 of the summary, form events column 51;
 - transmissions + 1 (the index case) equal the agents ever infected.
 
-## 7. Columns that are constant or unused in the final batches
+## 7. Columns that are constant or unused in the deposited batches
 
 - **Constant in every run:**
   - `sim.upc`, `sim.it` (1);
-  - `nb.ep.structure` within a batch;
+  - `nb.ep.structure` (`dynamic`);
   - `net.stable.pre` (0);
   - `net.assortativity.profession.pre.epidemic`, `index.assortativity.profession`,
     `net.assortativity.profession` (1.0);
-  - `net.static.pct.inf` and `net.dynamic.pct.inf` (0);
-  - the six `net.static.ties.*` counters (0 in paired, `NA` elsewhere);
-  - `paired.start.identical` (`true`);
+  - `net.dynamic.pct.inf` (0);
   - `nb.fix.order`, `nb.fix.d2` (`true`);
   - `nb.zeta.post` (10);
   - `nb.rs.equal` (1).
-- **`NA` outside the paired batch:** all eleven `net.static.*` columns.
+- **`NA` in every deposited batch:** all eleven `net.static.*` columns (they would hold the frozen
+  arm of the paired design, which no deposited batch uses).
 - **Equal to another column by construction:**
   - `net.dynamic.ties.broken.passive.epidemic` (= active);
   - `net.dynamic.ties.in.accepted.epidemic` (= out accepted);
@@ -295,7 +293,9 @@ Checks of these two files on the final build (batch/README.md, "Checked 5 Nov 20
   play no role).
 - **Not current after the burn-in:** `index.clustering` and the three `index.assortativity.*`
   columns of `round-summary.csv` (Section 4, column 25).
-- **Written by the build, but not by the final batches:**
+- **Written by the build, but not by the deposited batches:**
+  - `paired.start.identical` (summary, only with `nb.ep.structure` = `both`, after column 54:
+    `true` if both arms of a pair started from the same network);
   - `check.infected.cost.n` and `check.infected.cost.diff` (summary, only with
     `check.infected.cost=true`);
   - the five centrality columns of the round summary (only without `--no-centralities`);
